@@ -162,7 +162,7 @@ const NavButton = ({ active, onClick, icon, label }: { active: boolean, onClick:
   </button>
 );
 
-// 3. PlayModeOverlay
+// 3. PlayModeOverlay (Updated type definition)
 const PlayModeOverlay = ({ 
   moves, 
   events, 
