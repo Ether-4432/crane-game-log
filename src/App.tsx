@@ -134,7 +134,7 @@ const IOSInstallPrompt = () => {
   if (!isVisible) return null;
 
   return (
-    <div className="fixed bottom-20 left-4 right-4 bg-white/90 backdrop-blur-md p-4 rounded-xl shadow-2xl border border-gray-200 z-[100] animate-in slide-in-from-bottom-10 fade-in duration-500">
+    <div className="fixed bottom-24 left-4 right-4 bg-white/95 backdrop-blur-md p-4 rounded-xl shadow-2xl border border-gray-200 z-[100] animate-in slide-in-from-bottom-10 fade-in duration-500">
       <div className="flex justify-between items-start mb-2">
         <h3 className="font-bold text-gray-800">ホーム画面に追加してアプリ化</h3>
         <button onClick={() => setIsVisible(false)} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
@@ -145,7 +145,7 @@ const IOSInstallPrompt = () => {
         全画面で快適に利用できます。
       </p>
       <div className="flex justify-center">
-        <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-white/90 absolute -bottom-2"></div>
+        <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-transparent border-t-[8px] border-t-white/95 absolute -bottom-2"></div>
       </div>
     </div>
   );
@@ -476,8 +476,9 @@ export default function CraneGameLog() {
     );
   }
 
+  // --- レイアウト修正: Flexbox構成に変更し、fixed配置を廃止 ---
   return (
-    <div className="flex flex-col h-[100dvh] bg-gray-100 max-w-md mx-auto shadow-2xl overflow-hidden font-sans">
+    <div className="flex flex-col h-[100dvh] w-full bg-gray-100 max-w-md mx-auto shadow-2xl overflow-hidden font-sans">
       <IOSInstallPrompt />
       
       {/* Header */}
@@ -501,49 +502,51 @@ export default function CraneGameLog() {
         </div>
       </header>
 
-      {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto pb-24 no-scrollbar relative w-full">
-        {view === 'history' && (
-          <HistoryContainer 
-            records={records} 
-            onDelete={handleDeleteRecord} 
-            onEdit={handleEditClick} 
-            onAdd={() => {
-              setEditingRecord(null);
-              setView('add');
-            }} 
-          />
-        )}
-        {view === 'add' && (
-          <AddForm 
-            initialData={editingRecord}
-            storeOptions={storeOptions}
-            onSave={handleSaveRecord} 
-            onAddStore={handleAddStore}
-            onCancel={() => {
-              setEditingRecord(null);
-              setView('history');
-            }} 
-          />
-        )}
-        {view === 'stats' && (
-          <StatsView records={records} />
-        )}
-        {view === 'settings' && (
-          <SettingsView 
-            onBack={async () => {
-              await fetchData(); 
-              setView('history');
-            }} 
-            onDataChanged={fetchData}
-          />
-        )}
+      {/* Main Content Area: flex-1 で残りの領域を占有し、内部でスクロール */}
+      <main className="flex-1 overflow-y-auto no-scrollbar w-full bg-gray-100">
+        <div className="pb-4"> {/* 下部に少し余白を持たせる */}
+          {view === 'history' && (
+            <HistoryContainer 
+              records={records} 
+              onDelete={handleDeleteRecord} 
+              onEdit={handleEditClick} 
+              onAdd={() => {
+                setEditingRecord(null);
+                setView('add');
+              }} 
+            />
+          )}
+          {view === 'add' && (
+            <AddForm 
+              initialData={editingRecord}
+              storeOptions={storeOptions}
+              onSave={handleSaveRecord} 
+              onAddStore={handleAddStore}
+              onCancel={() => {
+                setEditingRecord(null);
+                setView('history');
+              }} 
+            />
+          )}
+          {view === 'stats' && (
+            <StatsView records={records} />
+          )}
+          {view === 'settings' && (
+            <SettingsView 
+              onBack={async () => {
+                await fetchData(); 
+                setView('history');
+              }} 
+              onDataChanged={fetchData}
+            />
+          )}
+        </div>
       </main>
 
-      {/* Bottom Navigation */}
+      {/* Bottom Navigation: shrink-0 で高さを確保し、Flexboxの並び順で最下部に配置 */}
       {view !== 'settings' && (
-        <nav className="bg-white border-t border-gray-200 fixed bottom-0 w-full max-w-md flex justify-around items-end h-[calc(4rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] z-20">
-          <div className="flex justify-around items-center w-full h-16">
+        <nav className="shrink-0 w-full bg-white border-t border-gray-200 pb-[env(safe-area-inset-bottom)] z-20">
+          <div className="flex justify-around items-end h-16 w-full max-w-md mx-auto relative">
             <NavButton 
               active={view === 'history'} 
               onClick={() => {
@@ -553,17 +556,21 @@ export default function CraneGameLog() {
               icon={<History size={24} />} 
               label="履歴" 
             />
-            <div className="relative -top-5">
+            {/* プラスボタンをナビゲーションバーの上に浮かせるための調整 */}
+            <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
               <button 
                 onClick={() => {
                   setEditingRecord(null);
                   setView('add');
                 }}
-                className="bg-gradient-to-tr from-pink-500 to-purple-500 text-white p-4 rounded-full shadow-lg hover:shadow-xl transform transition hover:scale-105 active:scale-95 flex items-center justify-center"
+                className="bg-gradient-to-tr from-pink-500 to-purple-500 text-white p-4 rounded-full shadow-lg hover:shadow-xl transform transition active:scale-95 flex items-center justify-center border-4 border-gray-100"
               >
                 <Plus size={28} strokeWidth={2.5} />
               </button>
             </div>
+            {/* ダミー要素で中央のスペースを確保 */}
+            <div className="w-12"></div>
+            
             <NavButton 
               active={view === 'stats'} 
               onClick={() => {
@@ -585,7 +592,7 @@ export default function CraneGameLog() {
 const NavButton = ({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) => (
   <button 
     onClick={onClick}
-    className={`flex flex-col items-center justify-center w-full h-full space-y-1 ${active ? 'text-purple-600' : 'text-gray-400'}`}
+    className={`flex flex-col items-center justify-center w-full h-full space-y-1 pb-2 ${active ? 'text-purple-600' : 'text-gray-400'}`}
   >
     {icon}
     <span className="text-[10px] font-medium">{label}</span>
@@ -616,7 +623,7 @@ const HistoryContainer = ({ records, onDelete, onEdit, onAdd }: { records: GameR
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1">
         {mode === 'list' ? (
           <ListView records={records} onDelete={onDelete} onEdit={onEdit} onAdd={onAdd} />
         ) : (
@@ -1395,7 +1402,6 @@ const AddForm = ({ initialData, storeOptions, onSave, onAddStore, onCancel }: { 
   );
 };
 
-// ... StatsView component (unchanged) ...
 const StatsView = ({ records }: { records: GameRecord[] }) => {
   const [periodType, setPeriodType] = useState<'day' | 'month' | 'year' | 'all'>('month');
   const [targetDate, setTargetDate] = useState(new Date());
@@ -1448,8 +1454,6 @@ const StatsView = ({ records }: { records: GameRecord[] }) => {
   return (
     <div className="p-5 space-y-6">
       <h2 className="text-xl font-bold text-gray-800 mb-4">戦績レポート</h2>
-      
-      {/* 期間選択タブ */}
       <div className="flex bg-gray-200 p-1 rounded-xl mb-4">
         {(['day', 'month', 'year', 'all'] as const).map((type) => (
           <button
@@ -1466,99 +1470,44 @@ const StatsView = ({ records }: { records: GameRecord[] }) => {
           </button>
         ))}
       </div>
-
-      {/* 日付ナビゲーター (全期間以外で表示) */}
       {periodType !== 'all' && (
         <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-gray-100 shadow-sm mb-4">
-          <button onClick={() => movePeriod(-1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500">
-            <ChevronLeft size={20} />
-          </button>
+          <button onClick={() => movePeriod(-1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500"><ChevronLeft size={20} /></button>
           <span className="font-bold text-gray-700">{formatDateLabel()}</span>
-          <button onClick={() => movePeriod(1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500">
-            <ChevronRight size={20} />
-          </button>
+          <button onClick={() => movePeriod(1)} className="p-1 hover:bg-gray-100 rounded-full text-gray-500"><ChevronRight size={20} /></button>
         </div>
       )}
-      
-      {/* Overview Cards */}
       <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-          <div className="text-xs text-gray-500 font-bold uppercase mb-1">総使用金額</div>
-          <div className="text-2xl font-black text-gray-800">¥{totalSpent.toLocaleString()}</div>
-        </div>
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-          <div className="text-xs text-gray-500 font-bold uppercase mb-1">獲得率</div>
-          <div className="text-2xl font-black text-gray-800">{winRate}<span className="text-sm font-normal text-gray-400">%</span></div>
-        </div>
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100"><div className="text-xs text-gray-500 font-bold uppercase mb-1">総使用金額</div><div className="text-2xl font-black text-gray-800">¥{totalSpent.toLocaleString()}</div></div>
+        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100"><div className="text-xs text-gray-500 font-bold uppercase mb-1">獲得率</div><div className="text-2xl font-black text-gray-800">{winRate}<span className="text-sm font-normal text-gray-400">%</span></div></div>
       </div>
-
-      {/* Win Stats Card */}
       <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-xl">
-        <h3 className="text-yellow-800 font-bold flex items-center gap-2 mb-3">
-          <Trophy size={18} className="fill-yellow-600 text-yellow-600" /> 獲得 (Win)
-        </h3>
+        <h3 className="text-yellow-800 font-bold flex items-center gap-2 mb-3"><Trophy size={18} className="fill-yellow-600 text-yellow-600" /> 獲得 (Win)</h3>
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <div className="text-xs text-yellow-600 font-bold mb-1">獲得総額</div>
-            <div className="text-xl font-black text-yellow-900">¥{winTotalSpent.toLocaleString()}</div>
-          </div>
-          <div>
-            <div className="text-xs text-yellow-600 font-bold mb-1">平均/個</div>
-            <div className="text-xl font-black text-yellow-900">¥{winAvg.toLocaleString()}</div>
-          </div>
+          <div><div className="text-xs text-yellow-600 font-bold mb-1">獲得総額</div><div className="text-xl font-black text-yellow-900">¥{winTotalSpent.toLocaleString()}</div></div>
+          <div><div className="text-xs text-yellow-600 font-bold mb-1">平均/個</div><div className="text-xl font-black text-yellow-900">¥{winAvg.toLocaleString()}</div></div>
         </div>
-        <div className="text-right text-xs text-yellow-700 mt-2 font-medium border-t border-yellow-200 pt-2">
-          {winCount} 個獲得
-        </div>
+        <div className="text-right text-xs text-yellow-700 mt-2 font-medium border-t border-yellow-200 pt-2">{winCount} 個獲得</div>
       </div>
-
-      {/* Lose Stats Card */}
       <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl">
-        <h3 className="text-blue-800 font-bold flex items-center gap-2 mb-3">
-          <Frown size={18} className="text-blue-600" /> 撤退 (Lose)
-        </h3>
+        <h3 className="text-blue-800 font-bold flex items-center gap-2 mb-3"><Frown size={18} className="text-blue-600" /> 撤退 (Lose)</h3>
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <div className="text-xs text-blue-600 font-bold mb-1">撤退総額</div>
-            <div className="text-xl font-black text-blue-900">¥{loseTotalSpent.toLocaleString()}</div>
-          </div>
-          <div>
-            <div className="text-xs text-blue-600 font-bold mb-1">平均/回</div>
-            <div className="text-xl font-black text-blue-900">¥{loseAvg.toLocaleString()}</div>
-          </div>
+          <div><div className="text-xs text-blue-600 font-bold mb-1">撤退総額</div><div className="text-xl font-black text-blue-900">¥{loseTotalSpent.toLocaleString()}</div></div>
+          <div><div className="text-xs text-blue-600 font-bold mb-1">平均/回</div><div className="text-xl font-black text-blue-900">¥{loseAvg.toLocaleString()}</div></div>
         </div>
-        <div className="text-right text-xs text-blue-700 mt-2 font-medium border-t border-blue-200 pt-2">
-          {loseCount} 回撤退
-        </div>
+        <div className="text-right text-xs text-blue-700 mt-2 font-medium border-t border-blue-200 pt-2">{loseCount} 回撤退</div>
       </div>
-
-      {/* Gallery */}
       {recentWins.length > 0 && (
         <div className="mt-6">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="font-bold text-gray-700">最近の獲得ギャラリー</h3>
-            <span className="text-xs text-gray-400">最新{recentWins.length}件</span>
-          </div>
+          <div className="flex justify-between items-center mb-3"><h3 className="font-bold text-gray-700">最近の獲得ギャラリー</h3><span className="text-xs text-gray-400">最新{recentWins.length}件</span></div>
           <div className="grid grid-cols-3 gap-2">
             {recentWins.map((r) => (
-              <div key={r.id} className="aspect-square rounded-lg overflow-hidden bg-gray-100 relative shadow-sm">
-                <img src={r.photoUrl!} alt={r.prizeName} className="w-full h-full object-cover" />
-                <div className="absolute bottom-0 w-full bg-gradient-to-t from-black/70 to-transparent p-1">
-                  <p className="text-[10px] text-white truncate">{r.prizeName}</p>
-                </div>
-              </div>
+              <div key={r.id} className="aspect-square rounded-lg overflow-hidden bg-gray-100 relative shadow-sm"><img src={r.photoUrl!} alt={r.prizeName} className="w-full h-full object-cover" /><div className="absolute bottom-0 w-full bg-gradient-to-t from-black/70 to-transparent p-1"><p className="text-[10px] text-white truncate">{r.prizeName}</p></div></div>
             ))}
           </div>
         </div>
       )}
-
-      {/* Encouragement */}
-      <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-5 text-white shadow-lg mt-6">
-        <h3 className="font-bold text-lg mb-1">次の景品も狙い撃ち！</h3>
-        <p className="text-sm opacity-90 mb-3">
-          {winRate > 50 ? '素晴らしい成績です！この調子でいきましょう。' : '焦らず狙いを定めて、確実な勝利を目指しましょう。'}
-        </p>
-      </div>
+      <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-5 text-white shadow-lg mt-6"><h3 className="font-bold text-lg mb-1">次の景品も狙い撃ち！</h3><p className="text-sm opacity-90 mb-3">{winRate > 50 ? '素晴らしい成績です！この調子でいきましょう。' : '焦らず狙いを定めて、確実な勝利を目指しましょう。'}</p></div>
     </div>
   );
 };
