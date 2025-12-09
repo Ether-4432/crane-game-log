@@ -44,7 +44,8 @@ type PlayEvent = {
   timestamp?: number;
 };
 
-type Record = {
+// 名前を Record から GameRecord に変更して衝突を回避
+type GameRecord = {
   id: string;
   date: string;
   storeName: string;
@@ -306,11 +307,11 @@ const SettingsView = ({ onBack, onDataChanged }: { onBack: () => void, onDataCha
 };
 
 export default function App() {
-  const [records, setRecords] = useState<Record[]>([]);
+  const [records, setRecords] = useState<GameRecord[]>([]);
   const [storeOptions, setStoreOptions] = useState<StoreOption[]>([]);
   const [view, setView] = useState<'history' | 'add' | 'stats' | 'settings'>('history');
   const [loading, setLoading] = useState(true);
-  const [editingRecord, setEditingRecord] = useState<Record | null>(null);
+  const [editingRecord, setEditingRecord] = useState<GameRecord | null>(null);
 
   // --- PWA & Mobile Optimization Effects ---
   useEffect(() => {
@@ -374,7 +375,7 @@ export default function App() {
 
       return new Promise<void>((resolve) => {
         transaction.oncomplete = () => {
-          const sortedRecords = (recordsReq.result as Record[]).sort((a, b) => 
+          const sortedRecords = (recordsReq.result as GameRecord[]).sort((a, b) => 
             new Date(b.date).getTime() - new Date(a.date).getTime() || b.createdAt - a.createdAt
           );
           setRecords(sortedRecords);
@@ -397,7 +398,7 @@ export default function App() {
   }, [fetchData]);
 
   // --- CRUD Operations ---
-  const handleSaveRecord = async (recordData: Omit<Record, 'id' | 'createdAt'>) => {
+  const handleSaveRecord = async (recordData: Omit<GameRecord, 'id' | 'createdAt'>) => {
     try {
       const db = await openDB();
       const tx = db.transaction('records', 'readwrite');
@@ -463,7 +464,7 @@ export default function App() {
     }
   };
 
-  const handleEditClick = (record: Record) => {
+  const handleEditClick = (record: GameRecord) => {
     setEditingRecord(record);
     setView('add');
   };
@@ -592,7 +593,7 @@ const NavButton = ({ active, onClick, icon, label }: { active: boolean, onClick:
   </button>
 );
 
-const HistoryContainer = ({ records, onDelete, onEdit, onAdd }: { records: Record[], onDelete: (id: string) => void, onEdit: (r: Record) => void, onAdd: () => void }) => {
+const HistoryContainer = ({ records, onDelete, onEdit, onAdd }: { records: GameRecord[], onDelete: (id: string) => void, onEdit: (r: GameRecord) => void, onAdd: () => void }) => {
   const [mode, setMode] = useState<'list' | 'calendar'>('list');
 
   return (
@@ -627,9 +628,9 @@ const HistoryContainer = ({ records, onDelete, onEdit, onAdd }: { records: Recor
   );
 };
 
-const CalendarView = ({ records, onEdit, onDelete }: { records: Record[], onEdit: (r: Record) => void, onDelete: (id: string) => void }) => {
+const CalendarView = ({ records, onEdit, onDelete }: { records: GameRecord[], onEdit: (r: GameRecord) => void, onDelete: (id: string) => void }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDay, setSelectedDay] = useState<{date: string, records: Record[]} | null>(null);
+  const [selectedDay, setSelectedDay] = useState<{date: string, records: GameRecord[]} | null>(null);
 
   const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
   const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
@@ -652,9 +653,9 @@ const CalendarView = ({ records, onEdit, onDelete }: { records: Record[], onEdit
       acc[day].records.push(record);
     }
     return acc;
-  }, {} as Record<number, { cost: number, count: number, records: Record[] }>);
+  }, {} as Record<number, { cost: number, count: number, records: GameRecord[] }>);
 
-  const handleDayClick = (day: number, dailyRecords: Record[]) => {
+  const handleDayClick = (day: number, dailyRecords: GameRecord[]) => {
     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     setSelectedDay({ date: dateStr, records: dailyRecords });
   };
@@ -848,7 +849,7 @@ const PlayModeOverlay = ({
   );
 };
 
-const AddForm = ({ initialData, storeOptions, onSave, onAddStore, onCancel }: { initialData?: Record | null, storeOptions: StoreOption[], onSave: (r: any) => void, onAddStore: (name: string) => void, onCancel: () => void }) => {
+const AddForm = ({ initialData, storeOptions, onSave, onAddStore, onCancel }: { initialData?: GameRecord | null, storeOptions: StoreOption[], onSave: (r: any) => void, onAddStore: (name: string) => void, onCancel: () => void }) => {
   const [formData, setFormData] = useState({
     date: initialData?.date || new Date().toISOString().split('T')[0],
     storeName: initialData?.storeName || '',
@@ -1256,7 +1257,7 @@ const AddForm = ({ initialData, storeOptions, onSave, onAddStore, onCancel }: { 
   );
 };
 
-const StatsView = ({ records }: { records: Record[] }) => {
+const StatsView = ({ records }: { records: GameRecord[] }) => {
   const [periodType, setPeriodType] = useState<'day' | 'month' | 'year' | 'all'>('month');
   const [targetDate, setTargetDate] = useState(new Date());
 
@@ -1426,7 +1427,7 @@ const StatsView = ({ records }: { records: Record[] }) => {
   );
 };
 
-const ListView = ({ records, onDelete, onEdit, onAdd }: { records: Record[], onDelete: (id: string) => void, onEdit: (r: Record) => void, onAdd: () => void }) => {
+const ListView = ({ records, onDelete, onEdit, onAdd }: { records: GameRecord[], onDelete: (id: string) => void, onEdit: (r: GameRecord) => void, onAdd: () => void }) => {
   const [filterStore, setFilterStore] = useState<string>('all');
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
 
@@ -1444,7 +1445,7 @@ const ListView = ({ records, onDelete, onEdit, onAdd }: { records: Record[], onD
     }
     acc[dateKey].push(record);
     return acc;
-  }, {} as Record<string, Record[]>);
+  }, {} as Record<string, GameRecord[]>);
 
   const sortedGroupedEntries = Object.entries(groupedRecords).sort((a, b) => {
     return new Date(b[0]).getTime() - new Date(a[0]).getTime();
@@ -1538,8 +1539,8 @@ const ListView = ({ records, onDelete, onEdit, onAdd }: { records: Record[], onD
                               <span className="text-xs font-bold text-gray-700">¥{record.totalCost.toLocaleString()}</span>
                             </div>
                             <div className="flex items-center gap-1">
-                              <button onClick={(e) => { e.stopPropagation(); onEdit(record); }} className="p-1.5 text-gray-400 hover:text-pink-500 hover:bg-white rounded-lg transition"><Edit size={14} /></button>
-                              <button onClick={(e) => { e.stopPropagation(); onDelete(record.id); }} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-white rounded-lg transition"><Trash2 size={14} /></button>
+                              <button onClick={() => { onEdit(record); setSelectedDay(null); }} className="p-1.5 text-gray-400 hover:text-pink-500 hover:bg-white rounded-lg transition"><Edit size={14} /></button>
+                              <button onClick={() => onDelete(record.id)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-white rounded-lg transition"><Trash2 size={14} /></button>
                             </div>
                           </div>
                         </div>
