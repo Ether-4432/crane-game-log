@@ -311,9 +311,13 @@ export default function CraneGameLog() {
   const [view, setView] = useState<'history' | 'add' | 'stats' | 'settings'>('history');
   const [loading, setLoading] = useState(true);
   const [editingRecord, setEditingRecord] = useState<GameRecord | null>(null);
+  
+  // iOSの高さズレ対策用State
+  const [viewportHeight, setViewportHeight] = useState('100vh');
 
   // --- PWA & Mobile Optimization Effects ---
   useEffect(() => {
+    // 1. Meta Tags Injection
     const metaTags = [
       { name: 'apple-mobile-web-app-capable', content: 'yes' },
       { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
@@ -331,6 +335,7 @@ export default function CraneGameLog() {
       element.setAttribute('content', tag.content);
     });
 
+    // 2. Global Styles
     const style = document.createElement('style');
     style.textContent = `
       body, html {
@@ -354,8 +359,20 @@ export default function CraneGameLog() {
     `;
     document.head.appendChild(style);
 
+    // 3. Viewport Height Calculation for iOS
+    const setHeight = () => {
+      // 実際の内側の高さを取得してセット（アドレスバーなどを除外した正確な高さ）
+      setViewportHeight(`${window.innerHeight}px`);
+    };
+
+    setHeight();
+    window.addEventListener('resize', setHeight);
+    window.addEventListener('orientationchange', setHeight);
+
     return () => {
       document.head.removeChild(style);
+      window.removeEventListener('resize', setHeight);
+      window.removeEventListener('orientationchange', setHeight);
     };
   }, []);
 
@@ -470,18 +487,22 @@ export default function CraneGameLog() {
 
   if (loading) {
     return (
-      <div className="flex h-[100dvh] items-center justify-center bg-gray-50 text-gray-500">
+      <div className="flex h-screen items-center justify-center bg-gray-50 text-gray-500">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500"></div>
       </div>
     );
   }
 
-  // --- レイアウト修正: Flexbox構成に変更し、fixed配置を廃止 ---
+  // --- Main Layout ---
+  // heightをJSで制御したviewportHeightに設定することで、iOSでのズレを防止
   return (
-    <div className="flex flex-col h-[100dvh] w-full bg-gray-100 max-w-md mx-auto shadow-2xl overflow-hidden font-sans">
+    <div 
+      className="flex flex-col w-full bg-gray-100 max-w-md mx-auto shadow-2xl overflow-hidden font-sans"
+      style={{ height: viewportHeight }}
+    >
       <IOSInstallPrompt />
       
-      {/* Header */}
+      {/* Header - safe-area-inset-top を考慮 */}
       <header className="bg-gradient-to-r from-pink-500 to-purple-600 text-white p-4 pt-[calc(1rem+env(safe-area-inset-top))] shadow-md z-10 shrink-0">
         <div className="flex justify-between items-center">
           <h1 className="text-xl font-bold flex items-center gap-2">
@@ -502,9 +523,9 @@ export default function CraneGameLog() {
         </div>
       </header>
 
-      {/* Main Content Area: flex-1 で残りの領域を占有し、内部でスクロール */}
+      {/* Main Content - 残りの高さを埋める */}
       <main className="flex-1 overflow-y-auto no-scrollbar w-full bg-gray-100">
-        <div className="pb-4"> {/* 下部に少し余白を持たせる */}
+        <div className="pb-4">
           {view === 'history' && (
             <HistoryContainer 
               records={records} 
@@ -543,9 +564,9 @@ export default function CraneGameLog() {
         </div>
       </main>
 
-      {/* Bottom Navigation: shrink-0 で高さを確保し、Flexboxの並び順で最下部に配置 */}
+      {/* Bottom Navigation - safe-area-inset-bottom を考慮したパディングを追加 */}
       {view !== 'settings' && (
-        <nav className="shrink-0 w-full bg-white border-t border-gray-200 pb-[env(safe-area-inset-bottom)] z-20">
+        <nav className="shrink-0 w-full bg-white border-t border-gray-200 z-20 pb-[env(safe-area-inset-bottom)]">
           <div className="flex justify-around items-end h-16 w-full max-w-md mx-auto relative">
             <NavButton 
               active={view === 'history'} 
@@ -556,7 +577,8 @@ export default function CraneGameLog() {
               icon={<History size={24} />} 
               label="履歴" 
             />
-            {/* プラスボタンをナビゲーションバーの上に浮かせるための調整 */}
+            
+            {/* Center Floating Button */}
             <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
               <button 
                 onClick={() => {
@@ -568,7 +590,8 @@ export default function CraneGameLog() {
                 <Plus size={28} strokeWidth={2.5} />
               </button>
             </div>
-            {/* ダミー要素で中央のスペースを確保 */}
+            
+            {/* Spacer for center button */}
             <div className="w-12"></div>
             
             <NavButton 
@@ -592,7 +615,7 @@ export default function CraneGameLog() {
 const NavButton = ({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) => (
   <button 
     onClick={onClick}
-    className={`flex flex-col items-center justify-center w-full h-full space-y-1 pb-2 ${active ? 'text-purple-600' : 'text-gray-400'}`}
+    className={`flex flex-col items-center justify-center w-full h-full space-y-1 pb-1 ${active ? 'text-purple-600' : 'text-gray-400'}`}
   >
     {icon}
     <span className="text-[10px] font-medium">{label}</span>
@@ -894,8 +917,8 @@ const ListView = ({ records, onDelete, onEdit, onAdd }: { records: GameRecord[],
                               <span className="text-xs font-bold text-gray-700">¥{record.totalCost.toLocaleString()}</span>
                             </div>
                             <div className="flex items-center gap-1">
-                              <button onClick={(e) => { e.stopPropagation(); onEdit(record); }} className="p-1.5 text-gray-400 hover:text-pink-500 p-1.5 transition"><Edit size={14} /></button>
-                              <button onClick={(e) => { e.stopPropagation(); onDelete(record.id); }} className="p-1.5 text-gray-400 hover:text-red-500 p-1.5 transition"><Trash2 size={14} /></button>
+                              <button onClick={() => { onEdit(record); }} className="p-1.5 text-gray-400 hover:text-pink-500 p-1.5 transition"><Edit size={14} /></button>
+                              <button onClick={() => onDelete(record.id)} className="p-1.5 text-gray-400 hover:text-red-500 p-1.5 transition"><Trash2 size={14} /></button>
                             </div>
                           </div>
                         </div>
@@ -917,79 +940,6 @@ const ListView = ({ records, onDelete, onEdit, onAdd }: { records: GameRecord[],
         })
       )}
       <div className="h-12 text-center text-xs text-gray-400 pt-4">これ以上の履歴はありません</div>
-    </div>
-  );
-};
-
-const PlayModeOverlay = ({ 
-  moves, 
-  events, 
-  onIncrement, 
-  onDecrement, 
-  onEvent, 
-  onClose 
-}: { 
-  moves: number, 
-  events: PlayEvent[], 
-  onIncrement: () => void, 
-  onDecrement: () => void, 
-  onEvent: (type: 'assist' | 'reset') => void,
-  onClose: () => void 
-}) => {
-  const [confirmType, setConfirmType] = useState<'assist' | 'reset' | null>(null);
-
-  return (
-    <div className="fixed inset-0 bg-white z-[60] flex flex-col animate-in slide-in-from-bottom duration-300 pb-[env(safe-area-inset-bottom)]">
-      <div className="p-4 pt-[calc(1rem+env(safe-area-inset-top))] flex justify-between items-center bg-gray-50 border-b border-gray-100">
-        <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2"><Gamepad2 className="text-pink-500" /> プレイモード</h2>
-        <button onClick={onClose} className="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-bold shadow-lg active:scale-95 transition">終了</button>
-      </div>
-      <div className="flex-1 flex flex-col p-6 gap-6 overflow-y-auto no-scrollbar">
-        <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 rounded-3xl border-4 border-gray-100 relative min-h-[200px]">
-          <div className="text-gray-400 font-bold text-xl uppercase mb-2">Move</div>
-          <div className="text-9xl font-black text-gray-800 tabular-nums tracking-tighter">{moves}</div>
-          <div className="absolute bottom-6 right-6 flex gap-4"><button onClick={onDecrement} className="w-16 h-16 bg-white border-2 border-gray-200 rounded-full flex items-center justify-center text-gray-400 shadow-sm active:scale-90 transition"><Minus size={32} /></button></div>
-          {events.length > 0 && (
-            <div className="absolute top-4 left-4 right-4 flex flex-wrap gap-2 pointer-events-none">
-              {events.map((ev, i) => (
-                <span key={i} className={`text-[10px] px-2 py-1 rounded-full font-bold shadow-sm flex items-center gap-1 ${ev.type === 'assist' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>
-                  {ev.type === 'assist' ? <HelpingHand size={10} /> : <RefreshCcw size={10} />}
-                  {ev.move}手
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="grid grid-cols-2 gap-4 h-48 flex-shrink-0">
-          <button onClick={onIncrement} className="col-span-2 bg-pink-500 text-white rounded-2xl shadow-xl active:bg-pink-600 active:scale-[0.98] transition flex items-center justify-center gap-4 group">
-            <Plus size={48} className="group-active:scale-125 transition duration-150" />
-            <span className="text-3xl font-black">カウント</span>
-          </button>
-          <button onClick={() => setConfirmType('reset')} className="bg-blue-50 border-2 border-blue-100 text-blue-600 rounded-xl active:bg-blue-100 transition flex flex-col items-center justify-center gap-1">
-            <RefreshCcw size={28} />
-            <span className="font-bold text-sm">初期位置</span>
-          </button>
-          <button onClick={() => setConfirmType('assist')} className="bg-green-50 border-2 border-green-100 text-green-600 rounded-xl active:bg-green-100 transition flex flex-col items-center justify-center gap-1">
-            <HelpingHand size={28} />
-            <span className="font-bold text-sm">アシスト</span>
-          </button>
-        </div>
-      </div>
-      {confirmType && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-xs shadow-2xl scale-100 animate-in zoom-in-95 duration-200 text-center">
-            <div className={`mx-auto w-12 h-12 rounded-full flex items-center justify-center mb-4 ${confirmType === 'assist' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
-              {confirmType === 'assist' ? <HelpingHand size={24} /> : <RefreshCcw size={24} />}
-            </div>
-            <h3 className="font-bold text-lg text-gray-800 mb-2">{confirmType === 'assist' ? 'アシストを記録しますか？' : '初期位置に戻しますか？'}</h3>
-            <p className="text-sm text-gray-500 mb-6">現在の「{moves}手目」に<br/>{confirmType === 'assist' ? '店員さんのアシスト' : '位置のリセット'}があったことを記録します。</p>
-            <div className="flex gap-3">
-              <button onClick={() => setConfirmType(null)} className="flex-1 py-3 text-gray-500 font-bold text-sm bg-gray-100 hover:bg-gray-200 rounded-xl transition">キャンセル</button>
-              <button onClick={() => { onEvent(confirmType); setConfirmType(null); }} className={`flex-1 py-3 text-white font-bold text-sm rounded-xl shadow-lg transition active:scale-95 ${confirmType === 'assist' ? 'bg-green-500 hover:bg-green-600' : 'bg-blue-500 hover:bg-blue-600'}`}>記録する</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -1402,10 +1352,11 @@ const AddForm = ({ initialData, storeOptions, onSave, onAddStore, onCancel }: { 
   );
 };
 
+// ... StatsView component (unchanged) ...
 const StatsView = ({ records }: { records: GameRecord[] }) => {
+  // ... (省略: StatsViewの中身は変更なしのため) ...
   const [periodType, setPeriodType] = useState<'day' | 'month' | 'year' | 'all'>('month');
   const [targetDate, setTargetDate] = useState(new Date());
-
   const movePeriod = (direction: -1 | 1) => {
     const newDate = new Date(targetDate);
     if (periodType === 'day') newDate.setDate(newDate.getDate() + direction);
@@ -1413,7 +1364,6 @@ const StatsView = ({ records }: { records: GameRecord[] }) => {
     if (periodType === 'year') newDate.setFullYear(newDate.getFullYear() + direction);
     setTargetDate(newDate);
   };
-
   const formatDateLabel = () => {
     if (periodType === 'all') return '全期間';
     if (periodType === 'year') return `${targetDate.getFullYear()}年`;
@@ -1421,24 +1371,17 @@ const StatsView = ({ records }: { records: GameRecord[] }) => {
     if (periodType === 'day') return `${targetDate.getFullYear()}年${targetDate.getMonth() + 1}月${targetDate.getDate()}日`;
     return '';
   };
-
   const filteredRecords = records.filter(r => {
     if (periodType === 'all') return true;
     const rDate = new Date(r.date);
-    
     if (rDate.getFullYear() !== targetDate.getFullYear()) return false;
     if (periodType === 'year') return true;
-
     if (rDate.getMonth() !== targetDate.getMonth()) return false;
     if (periodType === 'month') return true;
-
     if (rDate.getDate() !== targetDate.getDate()) return false;
     return true;
   });
-
   const totalSpent = filteredRecords.reduce((sum, r) => sum + r.totalCost, 0);
-  
-  // Win stats
   const winRecords = filteredRecords.filter(r => r.result === 'win');
   const loseRecords = filteredRecords.filter(r => r.result === 'lose');
   const winTotalSpent = winRecords.reduce((sum, r) => sum + r.totalCost, 0);
@@ -1456,18 +1399,7 @@ const StatsView = ({ records }: { records: GameRecord[] }) => {
       <h2 className="text-xl font-bold text-gray-800 mb-4">戦績レポート</h2>
       <div className="flex bg-gray-200 p-1 rounded-xl mb-4">
         {(['day', 'month', 'year', 'all'] as const).map((type) => (
-          <button
-            key={type}
-            onClick={() => setPeriodType(type)}
-            className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${
-              periodType === type ? 'bg-white text-pink-600 shadow-sm' : 'text-gray-500'
-            }`}
-          >
-            {type === 'day' && '日'}
-            {type === 'month' && '月'}
-            {type === 'year' && '年'}
-            {type === 'all' && '全期間'}
-          </button>
+          <button key={type} onClick={() => setPeriodType(type)} className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition ${periodType === type ? 'bg-white text-pink-600 shadow-sm' : 'text-gray-500'}`}>{type === 'day' && '日'}{type === 'month' && '月'}{type === 'year' && '年'}{type === 'all' && '全期間'}</button>
         ))}
       </div>
       {periodType !== 'all' && (
@@ -1481,22 +1413,8 @@ const StatsView = ({ records }: { records: GameRecord[] }) => {
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100"><div className="text-xs text-gray-500 font-bold uppercase mb-1">総使用金額</div><div className="text-2xl font-black text-gray-800">¥{totalSpent.toLocaleString()}</div></div>
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100"><div className="text-xs text-gray-500 font-bold uppercase mb-1">獲得率</div><div className="text-2xl font-black text-gray-800">{winRate}<span className="text-sm font-normal text-gray-400">%</span></div></div>
       </div>
-      <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-xl">
-        <h3 className="text-yellow-800 font-bold flex items-center gap-2 mb-3"><Trophy size={18} className="fill-yellow-600 text-yellow-600" /> 獲得 (Win)</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div><div className="text-xs text-yellow-600 font-bold mb-1">獲得総額</div><div className="text-xl font-black text-yellow-900">¥{winTotalSpent.toLocaleString()}</div></div>
-          <div><div className="text-xs text-yellow-600 font-bold mb-1">平均/個</div><div className="text-xl font-black text-yellow-900">¥{winAvg.toLocaleString()}</div></div>
-        </div>
-        <div className="text-right text-xs text-yellow-700 mt-2 font-medium border-t border-yellow-200 pt-2">{winCount} 個獲得</div>
-      </div>
-      <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl">
-        <h3 className="text-blue-800 font-bold flex items-center gap-2 mb-3"><Frown size={18} className="text-blue-600" /> 撤退 (Lose)</h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div><div className="text-xs text-blue-600 font-bold mb-1">撤退総額</div><div className="text-xl font-black text-blue-900">¥{loseTotalSpent.toLocaleString()}</div></div>
-          <div><div className="text-xs text-blue-600 font-bold mb-1">平均/回</div><div className="text-xl font-black text-blue-900">¥{loseAvg.toLocaleString()}</div></div>
-        </div>
-        <div className="text-right text-xs text-blue-700 mt-2 font-medium border-t border-blue-200 pt-2">{loseCount} 回撤退</div>
-      </div>
+      <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-xl"><h3 className="text-yellow-800 font-bold flex items-center gap-2 mb-3"><Trophy size={18} className="fill-yellow-600 text-yellow-600" /> 獲得 (Win)</h3><div className="grid grid-cols-2 gap-4"><div><div className="text-xs text-yellow-600 font-bold mb-1">獲得総額</div><div className="text-xl font-black text-yellow-900">¥{winTotalSpent.toLocaleString()}</div></div><div><div className="text-xs text-yellow-600 font-bold mb-1">平均/個</div><div className="text-xl font-black text-yellow-900">¥{winAvg.toLocaleString()}</div></div></div><div className="text-right text-xs text-yellow-700 mt-2 font-medium border-t border-yellow-200 pt-2">{winCount} 個獲得</div></div>
+      <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl"><h3 className="text-blue-800 font-bold flex items-center gap-2 mb-3"><Frown size={18} className="text-blue-600" /> 撤退 (Lose)</h3><div className="grid grid-cols-2 gap-4"><div><div className="text-xs text-blue-600 font-bold mb-1">撤退総額</div><div className="text-xl font-black text-blue-900">¥{loseTotalSpent.toLocaleString()}</div></div><div><div className="text-xs text-blue-600 font-bold mb-1">平均/回</div><div className="text-xl font-black text-blue-900">¥{loseAvg.toLocaleString()}</div></div></div><div className="text-right text-xs text-blue-700 mt-2 font-medium border-t border-blue-200 pt-2">{loseCount} 回撤退</div></div>
       {recentWins.length > 0 && (
         <div className="mt-6">
           <div className="flex justify-between items-center mb-3"><h3 className="font-bold text-gray-700">最近の獲得ギャラリー</h3><span className="text-xs text-gray-400">最新{recentWins.length}件</span></div>
