@@ -657,6 +657,7 @@ const HistoryContainer = ({ records, onDelete, onEdit, onAdd }: { records: GameR
   );
 };
 
+// ... CalendarView ...
 const CalendarView = ({ records, onEdit, onDelete }: { records: GameRecord[], onEdit: (r: GameRecord) => void, onDelete: (id: string) => void }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<{date: string, records: GameRecord[]} | null>(null);
@@ -805,145 +806,81 @@ const CalendarView = ({ records, onEdit, onDelete }: { records: GameRecord[], on
   );
 };
 
-const ListView = ({ records, onDelete, onEdit, onAdd }: { records: GameRecord[], onDelete: (id: string) => void, onEdit: (r: GameRecord) => void, onAdd: () => void }) => {
-  const [filterStore, setFilterStore] = useState<string>('all');
-  const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
-
-  const uniqueStores = Array.from(new Set(records.map(r => r.storeName).filter(Boolean))).sort();
-
-  const filteredRecords = records.filter(r => {
-    if (filterStore === 'all') return true;
-    return r.storeName === filterStore;
-  });
-
-  const groupedRecords = filteredRecords.reduce((acc, record) => {
-    const dateKey = record.date;
-    if (!acc[dateKey]) {
-      acc[dateKey] = [];
-    }
-    acc[dateKey].push(record);
-    return acc;
-  }, {} as Record<string, GameRecord[]>);
-
-  const sortedGroupedEntries = Object.entries(groupedRecords).sort((a, b) => {
-    return new Date(b[0]).getTime() - new Date(a[0]).getTime();
-  });
-
-  const toggleDate = (date: string) => {
-    const newExpanded = new Set(expandedDates);
-    if (newExpanded.has(date)) {
-      newExpanded.delete(date);
-    } else {
-      newExpanded.add(date);
-    }
-    setExpandedDates(newExpanded);
-  };
-
-  if (records.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full text-gray-400 space-y-4 p-8 text-center">
-        <Gamepad2 size={64} className="opacity-20" />
-        <p>記録がまだありません。<br />「+」ボタンから最初のプレイを記録しましょう！</p>
-        <button onClick={onAdd} className="bg-pink-500 text-white px-6 py-2 rounded-full text-sm font-bold shadow hover:bg-pink-600 transition">
-          記録する
-        </button>
-      </div>
-    );
-  }
+// ... PlayModeOverlay ...
+const PlayModeOverlay = ({ 
+  moves, 
+  events, 
+  onIncrement, 
+  onDecrement, 
+  onEvent, 
+  onClose 
+}: { 
+  moves: number, 
+  events: PlayEvent[], 
+  onIncrement: () => void, 
+  onDecrement: () => void, 
+  onEvent: (type: 'assist' | 'reset') => void,
+  onClose: () => void 
+}) => {
+  const [confirmType, setConfirmType] = useState<'assist' | 'reset' | null>(null);
 
   return (
-    <div className="p-4 space-y-6">
-      {uniqueStores.length > 0 && (
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
-          <Filter size={16} className="text-gray-400 flex-shrink-0" />
-          <button onClick={() => setFilterStore('all')} className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition ${filterStore === 'all' ? 'bg-pink-500 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-200'}`}>すべて</button>
-          {uniqueStores.map(store => (
-            <button key={store} onClick={() => setFilterStore(store)} className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition ${filterStore === store ? 'bg-pink-500 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-200'}`}>{store}</button>
-          ))}
+    <div className="fixed inset-0 bg-white z-[60] flex flex-col animate-in slide-in-from-bottom duration-300 pb-[env(safe-area-inset-bottom)]">
+      <div className="p-4 pt-[calc(1rem+env(safe-area-inset-top))] flex justify-between items-center bg-gray-50 border-b border-gray-100">
+        <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2"><Gamepad2 className="text-pink-500" /> プレイモード</h2>
+        <button onClick={onClose} className="px-4 py-2 bg-gray-800 text-white rounded-lg text-sm font-bold shadow-lg active:scale-95 transition">終了</button>
+      </div>
+      <div className="flex-1 flex flex-col p-6 gap-6 overflow-y-auto no-scrollbar">
+        <div className="flex-1 flex flex-col items-center justify-center bg-gray-50 rounded-3xl border-4 border-gray-100 relative min-h-[200px]">
+          <div className="text-gray-400 font-bold text-xl uppercase mb-2">Move</div>
+          <div className="text-9xl font-black text-gray-800 tabular-nums tracking-tighter">{moves}</div>
+          <div className="absolute bottom-6 right-6 flex gap-4"><button onClick={onDecrement} className="w-16 h-16 bg-white border-2 border-gray-200 rounded-full flex items-center justify-center text-gray-400 shadow-sm active:scale-90 transition"><Minus size={32} /></button></div>
+          {events.length > 0 && (
+            <div className="absolute top-4 left-4 right-4 flex flex-wrap gap-2 pointer-events-none">
+              {events.map((ev, i) => (
+                <span key={i} className={`text-[10px] px-2 py-1 rounded-full font-bold shadow-sm flex items-center gap-1 ${ev.type === 'assist' ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-blue-100 text-blue-700 border border-blue-200'}`}>
+                  {ev.type === 'assist' ? <HelpingHand size={10} /> : <RefreshCcw size={10} />}
+                  {ev.move}手
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-4 h-48 flex-shrink-0">
+          <button onClick={onIncrement} className="col-span-2 bg-pink-500 text-white rounded-2xl shadow-xl active:bg-pink-600 active:scale-[0.98] transition flex items-center justify-center gap-4 group">
+            <Plus size={48} className="group-active:scale-125 transition duration-150" />
+            <span className="text-3xl font-black">カウント</span>
+          </button>
+          <button onClick={() => setConfirmType('reset')} className="bg-blue-50 border-2 border-blue-100 text-blue-600 rounded-xl active:bg-blue-100 transition flex flex-col items-center justify-center gap-1">
+            <RefreshCcw size={28} />
+            <span className="font-bold text-sm">初期位置</span>
+          </button>
+          <button onClick={() => setConfirmType('assist')} className="bg-green-50 border-2 border-green-100 text-green-600 rounded-xl active:bg-green-100 transition flex flex-col items-center justify-center gap-1">
+            <HelpingHand size={28} />
+            <span className="font-bold text-sm">アシスト</span>
+          </button>
+        </div>
+      </div>
+      {confirmType && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[70] p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-xs shadow-2xl scale-100 animate-in zoom-in-95 duration-200 text-center">
+            <div className={`mx-auto w-12 h-12 rounded-full flex items-center justify-center mb-4 ${confirmType === 'assist' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'}`}>
+              {confirmType === 'assist' ? <HelpingHand size={24} /> : <RefreshCcw size={24} />}
+            </div>
+            <h3 className="font-bold text-lg text-gray-800 mb-2">{confirmType === 'assist' ? 'アシストを記録しますか？' : '初期位置に戻しますか？'}</h3>
+            <p className="text-sm text-gray-500 mb-6">現在の「{moves}手目」に<br/>{confirmType === 'assist' ? '店員さんのアシスト' : '位置のリセット'}があったことを記録します。</p>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirmType(null)} className="flex-1 py-3 text-gray-500 font-bold text-sm bg-gray-100 hover:bg-gray-200 rounded-xl transition">キャンセル</button>
+              <button onClick={() => { onEvent(confirmType); setConfirmType(null); }} className={`flex-1 py-3 text-white font-bold text-sm rounded-xl shadow-lg transition active:scale-95 ${confirmType === 'assist' ? 'bg-green-500 hover:bg-green-600' : 'bg-blue-500 hover:bg-blue-600'}`}>記録する</button>
+            </div>
+          </div>
         </div>
       )}
-
-      {sortedGroupedEntries.length === 0 ? (
-         <div className="text-center text-gray-400 py-8 text-sm">該当する記録がありません</div>
-      ) : (
-        sortedGroupedEntries.map(([date, groupRecords]) => {
-          const isExpanded = expandedDates.has(date);
-          const totalCost = groupRecords.reduce((sum, r) => sum + r.totalCost, 0);
-          
-          return (
-            <div key={date} className="bg-white rounded-xl overflow-hidden border border-gray-100 shadow-sm transition-all duration-300">
-              <div onClick={() => toggleDate(date)} className="flex items-center gap-3 p-3 bg-gray-50 cursor-pointer hover:bg-gray-100 transition select-none">
-                <div className="text-gray-400">{isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}</div>
-                <div className="flex-1 flex flex-col">
-                  <span className="text-sm font-bold text-gray-700">{new Date(date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' })}</span>
-                  <span className="text-[10px] text-gray-400 font-medium">{groupRecords.length} プレイ</span>
-                </div>
-                <span className="text-sm font-black text-gray-800 bg-white px-2 py-1 rounded-md border border-gray-100">¥{totalCost.toLocaleString()}</span>
-              </div>
-
-              {isExpanded && (
-                <div className="border-t border-gray-100 bg-white">
-                  {groupRecords.map((record, idx) => (
-                    <div key={record.id} className={`flex flex-col p-3 ${idx !== groupRecords.length - 1 ? 'border-b border-gray-50' : ''}`}>
-                      <div className="flex gap-3">
-                        <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 relative border border-gray-100">
-                          {record.photoUrl ? <img src={record.photoUrl} alt={record.prizeName} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-300"><Camera size={16} /></div>}
-                          <div className={`absolute bottom-0 w-full h-1 ${record.result === 'win' ? 'bg-yellow-400' : 'bg-blue-300'}`}></div>
-                        </div>
-                        <div className="flex-1 flex flex-col justify-between">
-                          <div>
-                            <h3 className="text-sm font-bold text-gray-800 line-clamp-1">{record.prizeName || '名称未設定'}</h3>
-                            <div className="flex items-center gap-2 mt-1 flex-wrap">
-                              <p className="text-[10px] text-gray-500 flex items-center gap-1"><MapPin size={8} /> {record.storeName || '店名なし'}</p>
-                              {/* イベントログの表示 */}
-                              {record.events && record.events.length > 0 ? (
-                                record.events.map((e, i) => (
-                                  <p key={i} className={`text-[9px] flex items-center gap-0.5 px-1 rounded border ${e.type === 'assist' ? 'text-green-700 bg-green-50 border-green-100' : 'text-blue-700 bg-blue-50 border-blue-100'}`}>
-                                    {e.type === 'assist' ? <HelpingHand size={8} /> : <RefreshCcw size={8} />} 
-                                    {e.move}手目
-                                  </p>
-                                ))
-                              ) : (
-                                <>
-                                  {record.startType && <p className="text-[9px] text-gray-500 flex items-center gap-0.5 bg-gray-100 px-1 rounded"><PlayCircle size={8} /> {record.startType === 'initial' ? '初期' : '途中'}</p>}
-                                  {record.hasAssist && <p className="text-[9px] text-green-700 flex items-center gap-0.5 bg-green-50 px-1 rounded border border-green-100"><HelpingHand size={8} /> {record.assistAt ? `${record.assistAt}手` : 'あり'}</p>}
-                                </>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex justify-between items-end mt-1">
-                            <div className="flex items-center gap-2">
-                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${record.result === 'win' ? 'bg-yellow-50 text-yellow-700 border border-yellow-100' : 'bg-blue-50 text-blue-600 border border-blue-100'}`}>{record.result === 'win' ? 'GET!' : '撤退'}</span>
-                              <span className="text-xs font-bold text-gray-700">¥{record.totalCost.toLocaleString()}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <button onClick={() => { onEdit(record); }} className="p-1.5 text-gray-400 hover:text-pink-500 p-1.5 transition"><Edit size={14} /></button>
-                              <button onClick={() => onDelete(record.id)} className="p-1.5 text-gray-400 hover:text-red-500 p-1.5 transition"><Trash2 size={14} /></button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* メモ表示 */}
-                      {record.memo && (
-                        <div className="mt-2 text-[11px] text-gray-600 bg-gray-50 p-2 rounded-lg border border-gray-100 flex gap-2 items-start">
-                          <FileText size={12} className="text-gray-400 mt-0.5 flex-shrink-0" />
-                          <span className="whitespace-pre-wrap leading-relaxed">{record.memo}</span>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })
-      )}
-      <div className="h-12 text-center text-xs text-gray-400 pt-4">これ以上の履歴はありません</div>
     </div>
   );
 };
 
+// ... AddForm ...
 const AddForm = ({ initialData, storeOptions, onSave, onAddStore, onCancel }: { initialData?: GameRecord | null, storeOptions: StoreOption[], onSave: (r: any) => void, onAddStore: (name: string) => void, onCancel: () => void }) => {
   const [formData, setFormData] = useState({
     date: initialData?.date || new Date().toISOString().split('T')[0],
@@ -1426,6 +1363,145 @@ const StatsView = ({ records }: { records: GameRecord[] }) => {
         </div>
       )}
       <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-2xl p-5 text-white shadow-lg mt-6"><h3 className="font-bold text-lg mb-1">次の景品も狙い撃ち！</h3><p className="text-sm opacity-90 mb-3">{winRate > 50 ? '素晴らしい成績です！この調子でいきましょう。' : '焦らず狙いを定めて、確実な勝利を目指しましょう。'}</p></div>
+    </div>
+  );
+};
+
+const ListView = ({ records, onDelete, onEdit, onAdd }: { records: GameRecord[], onDelete: (id: string) => void, onEdit: (r: GameRecord) => void, onAdd: () => void }) => {
+  const [filterStore, setFilterStore] = useState<string>('all');
+  const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
+
+  const uniqueStores = Array.from(new Set(records.map(r => r.storeName).filter(Boolean))).sort();
+
+  const filteredRecords = records.filter(r => {
+    if (filterStore === 'all') return true;
+    return r.storeName === filterStore;
+  });
+
+  const groupedRecords = filteredRecords.reduce((acc, record) => {
+    const dateKey = record.date;
+    if (!acc[dateKey]) {
+      acc[dateKey] = [];
+    }
+    acc[dateKey].push(record);
+    return acc;
+  }, {} as Record<string, GameRecord[]>);
+
+  const sortedGroupedEntries = Object.entries(groupedRecords).sort((a, b) => {
+    return new Date(b[0]).getTime() - new Date(a[0]).getTime();
+  });
+
+  const toggleDate = (date: string) => {
+    const newExpanded = new Set(expandedDates);
+    if (newExpanded.has(date)) {
+      newExpanded.delete(date);
+    } else {
+      newExpanded.add(date);
+    }
+    setExpandedDates(newExpanded);
+  };
+
+  if (records.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-gray-400 space-y-4 p-8 text-center">
+        <Gamepad2 size={64} className="opacity-20" />
+        <p>記録がまだありません。<br />「+」ボタンから最初のプレイを記録しましょう！</p>
+        <button onClick={onAdd} className="bg-pink-500 text-white px-6 py-2 rounded-full text-sm font-bold shadow hover:bg-pink-600 transition">
+          記録する
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-4 space-y-6">
+      {uniqueStores.length > 0 && (
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
+          <Filter size={16} className="text-gray-400 flex-shrink-0" />
+          <button onClick={() => setFilterStore('all')} className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition ${filterStore === 'all' ? 'bg-pink-500 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-200'}`}>すべて</button>
+          {uniqueStores.map(store => (
+            <button key={store} onClick={() => setFilterStore(store)} className={`px-3 py-1 rounded-full text-xs font-bold whitespace-nowrap transition ${filterStore === store ? 'bg-pink-500 text-white shadow-md' : 'bg-white text-gray-500 border border-gray-200'}`}>{store}</button>
+          ))}
+        </div>
+      )}
+
+      {sortedGroupedEntries.length === 0 ? (
+         <div className="text-center text-gray-400 py-8 text-sm">該当する記録がありません</div>
+      ) : (
+        sortedGroupedEntries.map(([date, groupRecords]) => {
+          const isExpanded = expandedDates.has(date);
+          const totalCost = groupRecords.reduce((sum, r) => sum + r.totalCost, 0);
+          
+          return (
+            <div key={date} className="bg-white rounded-xl overflow-hidden border border-gray-100 shadow-sm transition-all duration-300">
+              <div onClick={() => toggleDate(date)} className="flex items-center gap-3 p-3 bg-gray-50 cursor-pointer hover:bg-gray-100 transition select-none">
+                <div className="text-gray-400">{isExpanded ? <ChevronDown size={18} /> : <ChevronRight size={18} />}</div>
+                <div className="flex-1 flex flex-col">
+                  <span className="text-sm font-bold text-gray-700">{new Date(date).toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'short' })}</span>
+                  <span className="text-[10px] text-gray-400 font-medium">{groupRecords.length} プレイ</span>
+                </div>
+                <span className="text-sm font-black text-gray-800 bg-white px-2 py-1 rounded-md border border-gray-100">¥{totalCost.toLocaleString()}</span>
+              </div>
+
+              {isExpanded && (
+                <div className="border-t border-gray-100 bg-white">
+                  {groupRecords.map((record, idx) => (
+                    <div key={record.id} className={`flex flex-col p-3 ${idx !== groupRecords.length - 1 ? 'border-b border-gray-50' : ''}`}>
+                      <div className="flex gap-3">
+                        <div className="w-16 h-16 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0 relative border border-gray-100">
+                          {record.photoUrl ? <img src={record.photoUrl} alt={record.prizeName} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-300"><Camera size={16} /></div>}
+                          <div className={`absolute bottom-0 w-full h-1 ${record.result === 'win' ? 'bg-yellow-400' : 'bg-blue-300'}`}></div>
+                        </div>
+                        <div className="flex-1 flex flex-col justify-between">
+                          <div>
+                            <h3 className="text-sm font-bold text-gray-800 line-clamp-1">{record.prizeName || '名称未設定'}</h3>
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              <p className="text-[10px] text-gray-500 flex items-center gap-1"><MapPin size={8} /> {record.storeName || '店名なし'}</p>
+                              {/* イベントログの表示 */}
+                              {record.events && record.events.length > 0 ? (
+                                record.events.map((e, i) => (
+                                  <p key={i} className={`text-[9px] flex items-center gap-0.5 px-1 rounded border ${e.type === 'assist' ? 'text-green-700 bg-green-50 border-green-100' : 'text-blue-700 bg-blue-50 border-blue-100'}`}>
+                                    {e.type === 'assist' ? <HelpingHand size={8} /> : <RefreshCcw size={8} />} 
+                                    {e.move}手目
+                                  </p>
+                                ))
+                              ) : (
+                                <>
+                                  {record.startType && <p className="text-[9px] text-gray-500 flex items-center gap-0.5 bg-gray-100 px-1 rounded"><PlayCircle size={8} /> {record.startType === 'initial' ? '初期' : '途中'}</p>}
+                                  {record.hasAssist && <p className="text-[9px] text-green-700 flex items-center gap-0.5 bg-green-50 px-1 rounded border border-green-100"><HelpingHand size={8} /> {record.assistAt ? `${record.assistAt}手` : 'あり'}</p>}
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex justify-between items-end mt-1">
+                            <div className="flex items-center gap-2">
+                              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${record.result === 'win' ? 'bg-yellow-50 text-yellow-700 border border-yellow-100' : 'bg-blue-50 text-blue-600 border border-blue-100'}`}>{record.result === 'win' ? 'GET!' : '撤退'}</span>
+                              <span className="text-xs font-bold text-gray-700">¥{record.totalCost.toLocaleString()}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button onClick={() => { onEdit(record); }} className="p-1.5 text-gray-400 hover:text-pink-500 p-1.5 transition"><Edit size={14} /></button>
+                              <button onClick={() => onDelete(record.id)} className="p-1.5 text-gray-400 hover:text-red-500 p-1.5 transition"><Trash2 size={14} /></button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* メモ表示 */}
+                      {record.memo && (
+                        <div className="mt-2 text-[11px] text-gray-600 bg-gray-50 p-2 rounded-lg border border-gray-100 flex gap-2 items-start">
+                          <FileText size={12} className="text-gray-400 mt-0.5 flex-shrink-0" />
+                          <span className="whitespace-pre-wrap leading-relaxed">{record.memo}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })
+      )}
+      <div className="h-12 text-center text-xs text-gray-400 pt-4">これ以上の履歴はありません</div>
     </div>
   );
 };
