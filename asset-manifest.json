@@ -1,15 +1,15 @@
 {
   "files": {
-    "main.css": "/crane-game-log/static/css/main.2457d1e8.css",
-    "main.js": "/crane-game-log/static/js/main.99c3cc25.js",
+    "main.css": "/crane-game-log/static/css/main.183afe5f.css",
+    "main.js": "/crane-game-log/static/js/main.91dc4cfa.js",
     "static/js/453.c4da6abc.chunk.js": "/crane-game-log/static/js/453.c4da6abc.chunk.js",
     "index.html": "/crane-game-log/index.html",
-    "main.2457d1e8.css.map": "/crane-game-log/static/css/main.2457d1e8.css.map",
-    "main.99c3cc25.js.map": "/crane-game-log/static/js/main.99c3cc25.js.map",
+    "main.183afe5f.css.map": "/crane-game-log/static/css/main.183afe5f.css.map",
+    "main.91dc4cfa.js.map": "/crane-game-log/static/js/main.91dc4cfa.js.map",
     "453.c4da6abc.chunk.js.map": "/crane-game-log/static/js/453.c4da6abc.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.2457d1e8.css",
-    "static/js/main.99c3cc25.js"
+    "static/css/main.183afe5f.css",
+    "static/js/main.91dc4cfa.js"
   ]
 }
