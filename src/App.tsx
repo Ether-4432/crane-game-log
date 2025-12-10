@@ -68,6 +68,40 @@ type StoreOption = {
   createdAt: number;
 };
 
+// Form Data Type definition for state lifting
+type FormData = {
+  date: string;
+  storeName: string;
+  prizeName: string;
+  costPerPlay: number;
+  moves: number;
+  totalCost: number;
+  result: 'win' | 'lose';
+  photoUrl: string | null;
+  startType: 'initial' | 'continuation';
+  events: PlayEvent[];
+  memo: string;
+  hasAssist: boolean;
+  assistAt: number | undefined;
+};
+
+// Initial Form Data
+const INITIAL_FORM_DATA: FormData = {
+  date: new Date().toISOString().split('T')[0],
+  storeName: '',
+  prizeName: '',
+  costPerPlay: 100,
+  moves: 1,
+  totalCost: 100,
+  result: 'win',
+  photoUrl: null,
+  startType: 'initial',
+  events: [],
+  memo: '',
+  hasAssist: false,
+  assistAt: undefined
+};
+
 // --- IndexedDB Helper (Local Database) ---
 const DB_NAME = 'CraneGameLogDB';
 const DB_VERSION = 1;
@@ -117,7 +151,37 @@ const resizeImage = (file: File): Promise<string> => {
 
 // --- Components (Defined in dependency order) ---
 
-// 1. IOSInstallPrompt
+// 1. ConfirmationModal (NEW)
+const ConfirmationModal = ({ isOpen, onClose, onConfirm, message }: { isOpen: boolean, onClose: () => void, onConfirm: () => void, message: string }) => {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl p-6 w-full max-w-xs shadow-xl scale-100 animate-in zoom-in-95 duration-200">
+        <h3 className="font-bold text-lg text-gray-800 mb-2 flex items-center gap-2">
+          <AlertCircle className="text-red-500" /> 確認
+        </h3>
+        <p className="text-sm text-gray-600 mb-6 leading-relaxed whitespace-pre-wrap">{message}</p>
+        <div className="flex gap-3">
+          <button 
+            onClick={onClose} 
+            className="flex-1 py-2.5 text-gray-500 font-bold text-sm bg-gray-100 hover:bg-gray-200 rounded-xl transition"
+          >
+            キャンセル
+          </button>
+          <button 
+            onClick={onConfirm} 
+            className="flex-1 py-2.5 bg-red-500 text-white font-bold text-sm rounded-xl shadow-md hover:bg-red-600 transition"
+          >
+            破棄して移動
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// 2. IOSInstallPrompt
 const IOSInstallPrompt = () => {
   const [isVisible, setIsVisible] = useState(false);
 
@@ -151,7 +215,7 @@ const IOSInstallPrompt = () => {
   );
 };
 
-// 2. NavButton
+// 3. NavButton
 const NavButton = ({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) => (
   <button 
     onClick={onClick}
@@ -162,7 +226,7 @@ const NavButton = ({ active, onClick, icon, label }: { active: boolean, onClick:
   </button>
 );
 
-// 3. PlayModeOverlay (Updated type definition)
+// 4. PlayModeOverlay
 const PlayModeOverlay = ({ 
   moves, 
   events, 
@@ -181,11 +245,16 @@ const PlayModeOverlay = ({
   viewportHeight: string 
 }) => {
   const [confirmType, setConfirmType] = useState<'assist' | 'reset' | null>(null);
+  const [overlayHeight, setOverlayHeight] = useState(viewportHeight);
+
+  useEffect(() => {
+    setOverlayHeight(viewportHeight);
+  }, [viewportHeight]);
 
   return (
     <div 
       className="fixed top-0 left-0 w-full bg-white z-[60] flex flex-col animate-in slide-in-from-bottom duration-300 pb-[env(safe-area-inset-bottom)]"
-      style={{ height: viewportHeight }} 
+      style={{ height: overlayHeight }} 
     >
       <div className="p-4 pt-[calc(1rem+env(safe-area-inset-top))] flex justify-between items-center bg-gray-50 border-b border-gray-100">
         <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2"><Gamepad2 className="text-pink-500" /> プレイモード</h2>
@@ -241,7 +310,7 @@ const PlayModeOverlay = ({
   );
 };
 
-// 4. StatsView
+// 5. StatsView
 const StatsView = ({ records }: { records: GameRecord[] }) => {
   const [periodType, setPeriodType] = useState<'day' | 'month' | 'year' | 'all'>('month');
   const [targetDate, setTargetDate] = useState(new Date());
@@ -322,7 +391,7 @@ const StatsView = ({ records }: { records: GameRecord[] }) => {
   );
 };
 
-// 5. ListView
+// 6. ListView
 const ListView = ({ records, onDelete, onEdit, onAdd }: { records: GameRecord[], onDelete: (id: string) => void, onEdit: (r: GameRecord) => void, onAdd: () => void }) => {
   const [filterStore, setFilterStore] = useState<string>('all');
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
@@ -415,7 +484,7 @@ const ListView = ({ records, onDelete, onEdit, onAdd }: { records: GameRecord[],
   );
 };
 
-// 6. CalendarView
+// 7. CalendarView
 const CalendarView = ({ records, onEdit, onDelete }: { records: GameRecord[], onEdit: (r: GameRecord) => void, onDelete: (id: string) => void }) => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<{date: string, records: GameRecord[]} | null>(null);
@@ -523,7 +592,7 @@ const CalendarView = ({ records, onEdit, onDelete }: { records: GameRecord[], on
   );
 };
 
-// 7. HistoryContainer
+// 8. HistoryContainer
 const HistoryContainer = ({ records, onDelete, onEdit, onAdd }: { records: GameRecord[], onDelete: (id: string) => void, onEdit: (r: GameRecord) => void, onAdd: () => void }) => {
   const [mode, setMode] = useState<'list' | 'calendar'>('list');
 
@@ -542,34 +611,39 @@ const HistoryContainer = ({ records, onDelete, onEdit, onAdd }: { records: GameR
   );
 };
 
-// 8. AddForm
-const AddForm = ({ initialData, storeOptions, onSave, onAddStore, onCancel, viewportHeight }: { initialData?: GameRecord | null, storeOptions: StoreOption[], onSave: (r: any) => void, onAddStore: (name: string) => void, onCancel: () => void, viewportHeight: string }) => {
-  const [formData, setFormData] = useState({
-    date: initialData?.date || new Date().toISOString().split('T')[0],
-    storeName: initialData?.storeName || '',
-    prizeName: initialData?.prizeName || '',
-    costPerPlay: initialData?.costPerPlay || 100,
-    moves: initialData?.moves || 1,
-    result: initialData?.result || ('win' as 'win' | 'lose'),
-    photoUrl: initialData?.photoUrl || null,
-    startType: initialData?.startType || 'initial' as 'initial' | 'continuation',
-    events: initialData?.events || [] as PlayEvent[],
-    memo: initialData?.memo || '',
-    hasAssist: initialData?.hasAssist || false,
-    assistAt: initialData?.assistAt || undefined as number | undefined
-  });
+// 9. AddForm
+const AddForm = ({ 
+  initialData, 
+  storeOptions, 
+  onSave, 
+  onAddStore, 
+  onCancel, 
+  formData, 
+  setFormData, 
+  viewportHeight 
+}: { 
+  initialData: GameRecord | null, 
+  storeOptions: StoreOption[], 
+  onSave: (r: any) => void, 
+  onAddStore: (name: string) => void, 
+  onCancel: () => void, 
+  formData: FormData, 
+  setFormData: React.Dispatch<React.SetStateAction<FormData>>,
+  viewportHeight: string 
+}) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isStoreModalOpen, setIsStoreModalOpen] = useState(false);
   const [newStoreName, setNewStoreName] = useState('');
   const [isPlayMode, setIsPlayMode] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
   const totalCost = formData.costPerPlay * formData.moves;
 
   const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       try {
         const resized = await resizeImage(e.target.files[0]);
-        setFormData({ ...formData, photoUrl: resized });
+        setFormData(prev => ({ ...prev, photoUrl: resized }));
       } catch (err) {
         console.error("Image processing failed", err);
         alert("画像の処理に失敗しました。");
@@ -590,6 +664,10 @@ const AddForm = ({ initialData, storeOptions, onSave, onAddStore, onCancel, view
       return next;
     });
   };
+  
+  // onCancel is now passed from parent which includes the check logic
+  // But wait, the button in AddForm calls onCancel directly.
+  // The parent handles the logic.
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -620,31 +698,31 @@ const AddForm = ({ initialData, storeOptions, onSave, onAddStore, onCancel, view
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4">
-          <button type="button" onClick={() => setFormData({...formData, result: 'win'})} className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition ${formData.result === 'win' ? 'border-yellow-400 bg-yellow-50 text-yellow-700 shadow-sm' : 'border-gray-200 bg-white text-gray-400'}`}><Trophy size={28} className={formData.result === 'win' ? 'text-yellow-500' : ''} /><span className="font-bold">GET!</span></button>
-          <button type="button" onClick={() => setFormData({...formData, result: 'lose'})} className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition ${formData.result === 'lose' ? 'border-blue-400 bg-blue-50 text-blue-700 shadow-sm' : 'border-gray-200 bg-white text-gray-400'}`}><Frown size={28} className={formData.result === 'lose' ? 'text-blue-500' : ''} /><span className="font-bold">撤退...</span></button>
+          <button type="button" onClick={() => setFormData(prev => ({...prev, result: 'win'}))} className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition ${formData.result === 'win' ? 'border-yellow-400 bg-yellow-50 text-yellow-700 shadow-sm' : 'border-gray-200 bg-white text-gray-400'}`}><Trophy size={28} className={formData.result === 'win' ? 'text-yellow-500' : ''} /><span className="font-bold">GET!</span></button>
+          <button type="button" onClick={() => setFormData(prev => ({...prev, result: 'lose'}))} className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition ${formData.result === 'lose' ? 'border-blue-400 bg-blue-50 text-blue-700 shadow-sm' : 'border-gray-200 bg-white text-gray-400'}`}><Frown size={28} className={formData.result === 'lose' ? 'text-blue-500' : ''} /><span className="font-bold">撤退...</span></button>
         </div>
         <div className="bg-white p-5 rounded-2xl shadow-sm space-y-4">
-          <div className="space-y-1"><label className="text-xs font-bold text-gray-500 uppercase">日付</label><div className="relative"><input type="date" required value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 pl-10 focus:ring-2 focus:ring-pink-500 focus:outline-none" /><CalendarIcon size={18} className="absolute left-3 top-3.5 text-gray-400" /></div></div>
-          <div className="space-y-1"><label className="text-xs font-bold text-gray-500 uppercase">景品名</label><input type="text" required placeholder="例: ちいかわ ぬいぐるみ" value={formData.prizeName} onChange={(e) => setFormData({...formData, prizeName: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 focus:ring-2 focus:ring-pink-500 focus:outline-none" /></div>
-          <div className="space-y-1"><label className="text-xs font-bold text-gray-500 uppercase">店名</label><div className="flex gap-2"><div className="relative flex-1"><select value={formData.storeName} onChange={(e) => setFormData({...formData, storeName: e.target.value})} className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 pl-10 appearance-none focus:ring-2 focus:ring-pink-500 focus:outline-none"><option value="" disabled>店名を選択</option>{storeOptions.map(store => (<option key={store.id} value={store.name}>{store.name}</option>))}{formData.storeName && !storeOptions.some(s => s.name === formData.storeName) && (<option value={formData.storeName}>{formData.storeName}</option>)}</select><Store size={18} className="absolute left-3 top-3.5 text-gray-400" /><div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none"><ChevronRight className="w-4 h-4 text-gray-400 rotate-90" /></div></div><button type="button" onClick={handleAddStoreClick} className="bg-purple-100 text-purple-600 p-3 rounded-lg hover:bg-purple-200 transition flex items-center justify-center shadow-sm" title="新しい店名を追加"><Plus size={20} /></button></div></div>
+          <div className="space-y-1"><label className="text-xs font-bold text-gray-500 uppercase">日付</label><div className="relative"><input type="date" required value={formData.date} onChange={(e) => setFormData(prev => ({...prev, date: e.target.value}))} className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 pl-10 focus:ring-2 focus:ring-pink-500 focus:outline-none" /><CalendarIcon size={18} className="absolute left-3 top-3.5 text-gray-400" /></div></div>
+          <div className="space-y-1"><label className="text-xs font-bold text-gray-500 uppercase">景品名</label><input type="text" required placeholder="例: ちいかわ ぬいぐるみ" value={formData.prizeName} onChange={(e) => setFormData(prev => ({...prev, prizeName: e.target.value}))} className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 focus:ring-2 focus:ring-pink-500 focus:outline-none" /></div>
+          <div className="space-y-1"><label className="text-xs font-bold text-gray-500 uppercase">店名</label><div className="flex gap-2"><div className="relative flex-1"><select value={formData.storeName} onChange={(e) => setFormData(prev => ({...prev, storeName: e.target.value}))} className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 pl-10 appearance-none focus:ring-2 focus:ring-pink-500 focus:outline-none"><option value="" disabled>店名を選択</option>{storeOptions.map(store => (<option key={store.id} value={store.name}>{store.name}</option>))}{formData.storeName && !storeOptions.some(s => s.name === formData.storeName) && (<option value={formData.storeName}>{formData.storeName}</option>)}</select><Store size={18} className="absolute left-3 top-3.5 text-gray-400" /><div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none"><ChevronRight className="w-4 h-4 text-gray-400 rotate-90" /></div></div><button type="button" onClick={handleAddStoreClick} className="bg-purple-100 text-purple-600 p-3 rounded-lg hover:bg-purple-200 transition flex items-center justify-center shadow-sm" title="新しい店名を追加"><Plus size={20} /></button></div></div>
         </div>
         <div className="bg-white p-5 rounded-2xl shadow-sm space-y-4">
           <div className="space-y-2">
              <label className="text-xs font-bold text-gray-500 uppercase">プレイ状況</label>
              <div className="flex gap-2 mb-2">
-                <button type="button" onClick={() => setFormData({...formData, startType: 'initial'})} className={`flex-1 py-2 rounded-lg text-sm font-bold border transition ${formData.startType === 'initial' ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'border-gray-200 text-gray-400'}`}>初期位置から</button>
-                <button type="button" onClick={() => setFormData({...formData, startType: 'continuation'})} className={`flex-1 py-2 rounded-lg text-sm font-bold border transition ${formData.startType === 'continuation' ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'border-gray-200 text-gray-400'}`}>途中から</button>
+                <button type="button" onClick={() => setFormData(prev => ({...prev, startType: 'initial'}))} className={`flex-1 py-2 rounded-lg text-sm font-bold border transition ${formData.startType === 'initial' ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'border-gray-200 text-gray-400'}`}>初期位置から</button>
+                <button type="button" onClick={() => setFormData(prev => ({...prev, startType: 'continuation'}))} className={`flex-1 py-2 rounded-lg text-sm font-bold border transition ${formData.startType === 'continuation' ? 'bg-indigo-50 border-indigo-200 text-indigo-600' : 'border-gray-200 text-gray-400'}`}>途中から</button>
              </div>
              {formData.events.length > 0 && (<div className="space-y-1 mb-2"><div className="text-[10px] text-gray-400 font-bold uppercase">イベント履歴</div>{formData.events.map((ev, i) => (<div key={i} className="flex justify-between text-xs bg-gray-50 p-2 rounded border border-gray-100"><span className="flex items-center gap-1 font-bold text-gray-700">{ev.type === 'assist' ? <HelpingHand size={12} className="text-green-500"/> : <RefreshCcw size={12} className="text-blue-500"/>}{ev.type === 'assist' ? 'アシスト' : '初期位置'}</span><span>{ev.move}手目</span></div>))}</div>)}
           </div>
           <div className="border-t border-gray-100 my-2"></div>
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1"><label className="text-xs font-bold text-gray-500 uppercase">1PLAY料金</label><div className="relative"><select value={formData.costPerPlay} onChange={(e) => setFormData({...formData, costPerPlay: Number(e.target.value)})} className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 appearance-none focus:ring-2 focus:ring-pink-500 focus:outline-none"><option value="100">100円</option><option value="200">200円</option><option value="10">10円</option><option value="300">300円</option></select><DollarSign size={14} className="absolute right-3 top-4 text-gray-400 pointer-events-none" /></div></div>
-            <div className="space-y-1"><label className="text-xs font-bold text-gray-500 uppercase">手数</label><div className="flex items-center"><button type="button" onClick={() => setFormData(prev => ({...prev, moves: Math.max(1, prev.moves - 1)}))} className="w-10 h-10 bg-gray-100 rounded-l-lg flex items-center justify-center text-gray-600 font-bold hover:bg-gray-200">-</button><input type="number" min="1" value={formData.moves} onChange={(e) => setFormData({...formData, moves: Math.max(1, Number(e.target.value))})} className="w-full h-10 text-center bg-white border-y border-gray-200 focus:outline-none" /><button type="button" onClick={() => setFormData(prev => ({...prev, moves: prev.moves + 1}))} className="w-10 h-10 bg-gray-100 rounded-r-lg flex items-center justify-center text-gray-600 font-bold hover:bg-gray-200">+</button></div></div>
+            <div className="space-y-1"><label className="text-xs font-bold text-gray-500 uppercase">1PLAY料金</label><div className="relative"><select value={formData.costPerPlay} onChange={(e) => setFormData(prev => ({...prev, costPerPlay: Number(e.target.value)}))} className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 appearance-none focus:ring-2 focus:ring-pink-500 focus:outline-none"><option value="100">100円</option><option value="200">200円</option><option value="10">10円</option><option value="300">300円</option></select><DollarSign size={14} className="absolute right-3 top-4 text-gray-400 pointer-events-none" /></div></div>
+            <div className="space-y-1"><label className="text-xs font-bold text-gray-500 uppercase">手数</label><div className="flex items-center"><button type="button" onClick={() => setFormData(prev => ({...prev, moves: Math.max(1, prev.moves - 1)}))} className="w-10 h-10 bg-gray-100 rounded-l-lg flex items-center justify-center text-gray-600 font-bold hover:bg-gray-200">-</button><input type="number" min="1" value={formData.moves} onChange={(e) => setFormData(prev => ({...prev, moves: Math.max(1, Number(e.target.value))}))} className="w-full h-10 text-center bg-white border-y border-gray-200 focus:outline-none" /><button type="button" onClick={() => setFormData(prev => ({...prev, moves: prev.moves + 1}))} className="w-10 h-10 bg-gray-100 rounded-r-lg flex items-center justify-center text-gray-600 font-bold hover:bg-gray-200">+</button></div></div>
           </div>
           <div className="pt-2 border-t border-gray-100 flex justify-between items-center"><span className="text-sm font-bold text-gray-500">合計金額</span><span className="text-2xl font-black text-pink-600">¥{totalCost.toLocaleString()}</span></div>
         </div>
-        <div className="bg-white p-5 rounded-2xl shadow-sm space-y-2"><label className="text-xs font-bold text-gray-500 uppercase">メモ</label><textarea value={formData.memo} onChange={(e) => setFormData({...formData, memo: e.target.value})} placeholder="攻略のポイントや感想などを自由に記録..." className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 focus:ring-2 focus:ring-pink-500 focus:outline-none min-h-[80px]" /></div>
+        <div className="bg-white p-5 rounded-2xl shadow-sm space-y-2"><label className="text-xs font-bold text-gray-500 uppercase">メモ</label><textarea value={formData.memo} onChange={(e) => setFormData(prev => ({...prev, memo: e.target.value}))} placeholder="攻略のポイントや感想などを自由に記録..." className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 focus:ring-2 focus:ring-pink-500 focus:outline-none min-h-[80px]" /></div>
         <button type="submit" disabled={isSubmitting} className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-xl transform active:scale-95 transition flex items-center justify-center gap-2">{isSubmitting ? (<span className="animate-pulse">保存中...</span>) : (<><Save size={20} />{initialData ? '更新を保存' : '記録を保存'}</>)}</button>
         <div className="h-8"></div>
       </form>
@@ -661,7 +739,7 @@ const AddForm = ({ initialData, storeOptions, onSave, onAddStore, onCancel, view
   );
 };
 
-// 9. SettingsView
+// 10. SettingsView
 const SettingsView = ({ onBack, onDataChanged }: { onBack: () => void, onDataChanged: () => Promise<void> }) => {
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
@@ -792,7 +870,7 @@ const SettingsView = ({ onBack, onDataChanged }: { onBack: () => void, onDataCha
   );
 };
 
-// 10. CraneGameLog (Main Component)
+// 11. CraneGameLog (Main Component)
 export default function CraneGameLog() {
   const [records, setRecords] = useState<GameRecord[]>([]);
   const [storeOptions, setStoreOptions] = useState<StoreOption[]>([]);
@@ -800,8 +878,13 @@ export default function CraneGameLog() {
   const [loading, setLoading] = useState(true);
   const [editingRecord, setEditingRecord] = useState<GameRecord | null>(null);
   
-  // iOSの高さズレ対策用State
+  // State for form data lifted up
+  const [formData, setFormData] = useState<FormData>(INITIAL_FORM_DATA);
   const [viewportHeight, setViewportHeight] = useState('100vh');
+
+  // Confirmation Modal State
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [pendingView, setPendingView] = useState<'history' | 'add' | 'stats' | 'settings' | null>(null);
 
   // --- PWA & Mobile Optimization Effects ---
   useEffect(() => {
@@ -812,7 +895,6 @@ export default function CraneGameLog() {
       { name: 'viewport', content: 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover' },
       { name: 'theme-color', content: '#f3f4f6' }
     ];
-
     metaTags.forEach(tag => {
       let element = document.querySelector(`meta[name="${tag.name}"]`);
       if (!element) {
@@ -849,10 +931,8 @@ export default function CraneGameLog() {
 
     // 3. Viewport Height Calculation for iOS
     const setHeight = () => {
-      // 実際の内側の高さを取得してセット（アドレスバーなどを除外した正確な高さ）
       setViewportHeight(`${window.innerHeight}px`);
     };
-
     setHeight();
     window.addEventListener('resize', setHeight);
     window.addEventListener('orientationchange', setHeight);
@@ -868,12 +948,9 @@ export default function CraneGameLog() {
   const fetchData = useCallback(async () => {
     try {
       const db = await openDB();
-      
       const transaction = db.transaction(['records', 'store_options'], 'readonly');
-      
       const recordsStore = transaction.objectStore('records');
       const recordsReq = recordsStore.getAll();
-      
       const storesStore = transaction.objectStore('store_options');
       const storesReq = storesStore.getAll();
 
@@ -883,10 +960,8 @@ export default function CraneGameLog() {
             new Date(b.date).getTime() - new Date(a.date).getTime() || b.createdAt - a.createdAt
           );
           setRecords(sortedRecords);
-
           const sortedStores = (storesReq.result as StoreOption[]).sort((a, b) => a.createdAt - b.createdAt);
           setStoreOptions(sortedStores);
-          
           setLoading(false);
           resolve();
         };
@@ -901,31 +976,59 @@ export default function CraneGameLog() {
     fetchData();
   }, [fetchData]);
 
+  // --- Navigation Check Logic ---
+  const handleNavigation = (targetView: 'history' | 'add' | 'stats' | 'settings') => {
+    if (view === 'add') {
+      // Check dirty state more thoroughly? For now, if any main field is filled
+      const isNewAndDirty = !editingRecord && (
+        formData.prizeName !== '' || 
+        formData.storeName !== '' || 
+        formData.moves > 1 || 
+        formData.photoUrl !== null
+      );
+      // If editing, always confirm if navigating away without saving? 
+      // Or maybe check against original record. For simplicity, confirm.
+      const shouldConfirm = editingRecord ? true : isNewAndDirty;
+
+      if (shouldConfirm) {
+        setPendingView(targetView);
+        setShowConfirmDialog(true);
+      } else {
+        setFormData(INITIAL_FORM_DATA);
+        setEditingRecord(null);
+        setView(targetView);
+      }
+    } else {
+      setView(targetView);
+    }
+  };
+
+  const confirmNavigation = () => {
+    if (pendingView) {
+      setFormData(INITIAL_FORM_DATA);
+      setEditingRecord(null);
+      setView(pendingView);
+      setPendingView(null);
+    }
+    setShowConfirmDialog(false);
+  };
+
   // --- CRUD Operations ---
   const handleSaveRecord = async (recordData: Omit<GameRecord, 'id' | 'createdAt'>) => {
     try {
       const db = await openDB();
       const tx = db.transaction('records', 'readwrite');
       const store = tx.objectStore('records');
-
       if (editingRecord) {
-        await store.put({
-          ...recordData,
-          id: editingRecord.id,
-          createdAt: editingRecord.createdAt
-        });
+        await store.put({ ...recordData, id: editingRecord.id, createdAt: editingRecord.createdAt });
         setEditingRecord(null);
       } else {
-        await store.add({
-          ...recordData,
-          id: crypto.randomUUID(),
-          createdAt: Date.now()
-        });
+        await store.add({ ...recordData, id: crypto.randomUUID(), createdAt: Date.now() });
       }
-
       await new Promise(resolve => { tx.oncomplete = resolve; });
       await fetchData();
       setView('history');
+      setFormData(INITIAL_FORM_DATA); 
     } catch (e) {
       console.error("Error saving document: ", e);
       alert("保存に失敗しました。");
@@ -937,13 +1040,7 @@ export default function CraneGameLog() {
       const db = await openDB();
       const tx = db.transaction('store_options', 'readwrite');
       const store = tx.objectStore('store_options');
-      
-      await store.add({
-        id: crypto.randomUUID(),
-        name: storeName.trim(),
-        createdAt: Date.now()
-      });
-
+      await store.add({ id: crypto.randomUUID(), name: storeName.trim(), createdAt: Date.now() });
       await new Promise(resolve => { tx.oncomplete = resolve; });
       await fetchData();
     } catch (e) {
@@ -958,9 +1055,7 @@ export default function CraneGameLog() {
       const db = await openDB();
       const tx = db.transaction('records', 'readwrite');
       const store = tx.objectStore('records');
-      
       await store.delete(id);
-      
       await new Promise(resolve => { tx.oncomplete = resolve; });
       await fetchData();
     } catch (e) {
@@ -970,8 +1065,13 @@ export default function CraneGameLog() {
 
   const handleEditClick = (record: GameRecord) => {
     setEditingRecord(record);
+    setFormData({ ...INITIAL_FORM_DATA, ...record, assistAt: record.assistAt === null ? undefined : record.assistAt, events: record.events || [] });
     setView('add');
   };
+  
+  const handleCancelForm = () => {
+    handleNavigation('history');
+  }
 
   if (loading) {
     return (
@@ -987,24 +1087,20 @@ export default function CraneGameLog() {
       style={{ height: viewportHeight }}
     >
       <IOSInstallPrompt />
+      <ConfirmationModal 
+        isOpen={showConfirmDialog} 
+        onClose={() => setShowConfirmDialog(false)} 
+        onConfirm={confirmNavigation} 
+        message="入力中のデータがあります。破棄して移動してもよろしいですか？"
+      />
       
       {/* Header */}
       <header className="bg-gradient-to-r from-pink-500 to-purple-600 text-white p-4 pt-[calc(1rem+env(safe-area-inset-top))] shadow-md z-10 shrink-0">
         <div className="flex justify-between items-center">
-          <h1 className="text-xl font-bold flex items-center gap-2">
-            <Gamepad2 className="w-6 h-6" />
-            クレログ
-          </h1>
+          <h1 className="text-xl font-bold flex items-center gap-2"><Gamepad2 className="w-6 h-6" />クレログ</h1>
           <div className="flex items-center gap-2">
-            <div className="text-xs bg-white/20 px-2 py-1 rounded-full">
-              {records.length} プレイ
-            </div>
-            <button 
-              onClick={() => setView('settings')}
-              className="p-1.5 bg-white/20 rounded-full hover:bg-white/30 transition text-white"
-            >
-              <Settings size={18} />
-            </button>
+            <div className="text-xs bg-white/20 px-2 py-1 rounded-full">{records.length} プレイ</div>
+            <button onClick={() => handleNavigation('settings')} className="p-1.5 bg-white/20 rounded-full hover:bg-white/30 transition text-white"><Settings size={18} /></button>
           </div>
         </div>
       </header>
@@ -1012,42 +1108,10 @@ export default function CraneGameLog() {
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto no-scrollbar w-full bg-gray-100">
         <div className="pb-4">
-          {view === 'history' && (
-            <HistoryContainer 
-              records={records} 
-              onDelete={handleDeleteRecord} 
-              onEdit={handleEditClick} 
-              onAdd={() => {
-                setEditingRecord(null);
-                setView('add');
-              }} 
-            />
-          )}
-          {view === 'add' && (
-            <AddForm 
-              initialData={editingRecord}
-              storeOptions={storeOptions}
-              onSave={handleSaveRecord} 
-              onAddStore={handleAddStore}
-              onCancel={() => {
-                setEditingRecord(null);
-                setView('history');
-              }}
-              viewportHeight={viewportHeight}
-            />
-          )}
-          {view === 'stats' && (
-            <StatsView records={records} />
-          )}
-          {view === 'settings' && (
-            <SettingsView 
-              onBack={async () => {
-                await fetchData(); 
-                setView('history');
-              }} 
-              onDataChanged={fetchData}
-            />
-          )}
+          {view === 'history' && <HistoryContainer records={records} onDelete={handleDeleteRecord} onEdit={handleEditClick} onAdd={() => { setEditingRecord(null); setFormData(INITIAL_FORM_DATA); setView('add'); }} />}
+          {view === 'add' && <AddForm initialData={editingRecord} storeOptions={storeOptions} onSave={handleSaveRecord} onAddStore={handleAddStore} onCancel={handleCancelForm} viewportHeight={viewportHeight} formData={formData} setFormData={setFormData} />}
+          {view === 'stats' && <StatsView records={records} />}
+          {view === 'settings' && <SettingsView onBack={async () => { await fetchData(); handleNavigation('history'); }} onDataChanged={fetchData} />}
         </div>
       </main>
 
@@ -1055,41 +1119,12 @@ export default function CraneGameLog() {
       {view !== 'settings' && (
         <nav className="shrink-0 w-full bg-white border-t border-gray-200 z-20 pb-[env(safe-area-inset-bottom)]">
           <div className="flex justify-around items-end h-16 w-full max-w-md mx-auto relative">
-            <NavButton 
-              active={view === 'history'} 
-              onClick={() => {
-                setEditingRecord(null);
-                setView('history');
-              }} 
-              icon={<History size={24} />} 
-              label="履歴" 
-            />
-            
-            {/* Center Floating Button */}
+            <NavButton active={view === 'history'} onClick={() => handleNavigation('history')} icon={<History size={24} />} label="履歴" />
             <div className="absolute -top-6 left-1/2 transform -translate-x-1/2">
-              <button 
-                onClick={() => {
-                  setEditingRecord(null);
-                  setView('add');
-                }}
-                className="bg-gradient-to-tr from-pink-500 to-purple-500 text-white p-4 rounded-full shadow-lg hover:shadow-xl transform transition active:scale-95 flex items-center justify-center border-4 border-gray-100"
-              >
-                <Plus size={28} strokeWidth={2.5} />
-              </button>
+              <button onClick={() => { if (view !== 'add') { setEditingRecord(null); setFormData(INITIAL_FORM_DATA); setView('add'); } }} className="bg-gradient-to-tr from-pink-500 to-purple-500 text-white p-4 rounded-full shadow-lg hover:shadow-xl transform transition active:scale-95 flex items-center justify-center border-4 border-gray-100"><Plus size={28} strokeWidth={2.5} /></button>
             </div>
-            
-            {/* Spacer for center button */}
             <div className="w-12"></div>
-            
-            <NavButton 
-              active={view === 'stats'} 
-              onClick={() => {
-                setEditingRecord(null);
-                setView('stats');
-              }} 
-              icon={<BarChart3 size={24} />} 
-              label="分析" 
-            />
+            <NavButton active={view === 'stats'} onClick={() => handleNavigation('stats')} icon={<BarChart3 size={24} />} label="分析" />
           </div>
         </nav>
       )}
