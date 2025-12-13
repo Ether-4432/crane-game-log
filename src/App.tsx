@@ -44,7 +44,9 @@ import {
   ExternalLink,
   Pencil,
   Image as ImageIcon,
-  PieChart
+  PieChart,
+  ArrowLeft,
+  List
 } from 'lucide-react';
 
 // --- Types ---
@@ -224,7 +226,7 @@ const ConfirmationModal = ({ isOpen, onClose, onConfirm, message }: { isOpen: bo
         <p className="text-sm text-gray-600 mb-6 leading-relaxed whitespace-pre-wrap">{message}</p>
         <div className="flex gap-3">
           <button onClick={onClose} className="flex-1 py-2.5 text-gray-500 font-bold text-sm bg-gray-100 hover:bg-gray-200 rounded-xl transition">キャンセル</button>
-          <button onClick={onConfirm} className="flex-1 py-2.5 bg-red-500 text-white font-bold text-sm rounded-xl shadow-md hover:bg-red-600 transition">破棄して移動</button>
+          <button onClick={onConfirm} className="flex-1 py-2.5 bg-red-500 text-white font-bold text-sm rounded-xl shadow-md hover:bg-red-600 transition">実行する</button>
         </div>
       </div>
     </div>
@@ -259,7 +261,89 @@ const AddOptionModal = ({ isOpen, onClose, onAdd, title, placeholder }: { isOpen
   );
 };
 
-// 3. StoreDetailModal
+// 3. ManageOptions
+const ManageOptions = ({ 
+  type, 
+  data, 
+  onUpdate, 
+  onDelete, 
+  onClose 
+}: { 
+  type: 'store' | 'series' | 'setting' | 'finish', 
+  data: OptionItem[], 
+  onUpdate: (id: string, name: string) => void, 
+  onDelete: (id: string) => void,
+  onClose: () => void
+}) => {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+
+  const getTitle = () => {
+    switch(type) {
+      case 'store': return '店舗名の管理';
+      case 'series': return 'シリーズ名の管理';
+      case 'setting': return '設定名の管理';
+      case 'finish': return '決め手名の管理';
+    }
+  };
+
+  const startEdit = (item: OptionItem) => {
+    setEditingId(item.id);
+    setEditValue(item.name);
+  };
+
+  const saveEdit = () => {
+    if (editingId && editValue.trim()) {
+      onUpdate(editingId, editValue.trim());
+      setEditingId(null);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-white z-[80] flex flex-col animate-in slide-in-from-right duration-300">
+      <div className="p-4 pt-[calc(1rem+env(safe-area-inset-top))] flex items-center gap-2 border-b border-gray-100 bg-white">
+        <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full"><ArrowLeft size={24} className="text-gray-600" /></button>
+        <h2 className="text-lg font-bold text-gray-800">{getTitle()}</h2>
+      </div>
+      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+        <p className="text-xs text-gray-500 mb-4 bg-yellow-50 p-3 rounded-lg border border-yellow-100">
+           ※ここでの変更は、過去のすべての記録にも反映されます。
+        </p>
+        {data.length === 0 ? (
+          <div className="text-center text-gray-400 py-10">データがありません</div>
+        ) : (
+          data.map(item => (
+            <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+              {editingId === item.id ? (
+                <div className="flex-1 flex gap-2">
+                  <input 
+                    type="text" 
+                    value={editValue} 
+                    onChange={(e) => setEditValue(e.target.value)}
+                    className="flex-1 p-2 border border-blue-300 rounded-lg outline-none text-sm"
+                    autoFocus
+                  />
+                  <button onClick={saveEdit} className="bg-blue-500 text-white px-3 rounded-lg text-xs font-bold">保存</button>
+                  <button onClick={() => setEditingId(null)} className="bg-gray-200 text-gray-600 px-3 rounded-lg text-xs font-bold">キャンセル</button>
+                </div>
+              ) : (
+                <>
+                  <span className="font-bold text-gray-700">{item.name}</span>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => startEdit(item)} className="p-2 text-gray-400 hover:text-blue-500"><Pencil size={16}/></button>
+                    <button onClick={() => { if(window.confirm('本当に削除しますか？\n（過去の記録の表示は維持されますが、選択肢からは消えます）')) onDelete(item.id); }} className="p-2 text-gray-400 hover:text-red-500"><Trash2 size={16}/></button>
+                  </div>
+                </>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
+
+// 4. StoreDetailModal
 const StoreDetailModal = ({ 
   store, 
   isOpen, 
@@ -290,57 +374,6 @@ const StoreDetailModal = ({
 
   if (!isOpen || !editingStore) return null;
 
-  // --- Statistics Logic for specific store ---
-  const storeRecords = allRecords.filter(r => r.storeName === editingStore.name);
-  const winRecords = storeRecords.filter(r => r.result === 'win');
-  const loseRecords = storeRecords.filter(r => r.result === 'lose');
-
-  const totalSpent = storeRecords.reduce((sum, r) => sum + r.totalCost, 0);
-  const winCount = winRecords.length;
-  const winRate = storeRecords.length > 0 ? Math.round((winCount / storeRecords.length) * 100) : 0;
-  
-  // 獲得時
-  const winTotalCost = winRecords.reduce((sum, r) => sum + r.totalCost, 0);
-  const winAvgCost = winCount > 0 ? Math.round(winTotalCost / winCount) : 0;
-
-  // 撤退時
-  const loseTotalCost = loseRecords.reduce((sum, r) => sum + r.totalCost, 0);
-  const loseCount = loseRecords.length;
-  const loseAvgCost = loseCount > 0 ? Math.round(loseTotalCost / loseCount) : 0;
-  
-  // 実質平均単価（撤退込）
-  const realAvgCostPerWin = winCount > 0 ? Math.round(totalSpent / winCount) : 0;
-
-  // 決め手集計
-  const finishCounts = winRecords.reduce((acc, r) => {
-    const type = r.finishType || '未設定';
-    acc[type] = (acc[type] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  // 円グラフ用データ作成
-  const PIE_COLORS = ['#fbbf24', '#f87171', '#60a5fa', '#34d399', '#a78bfa', '#fb923c', '#9ca3af'];
-  const finishData = Object.entries(finishCounts)
-    .sort((a, b) => b[1] - a[1]) // 多い順にソート
-    .map(([name, count], index) => ({
-      name,
-      count,
-      color: PIE_COLORS[index % PIE_COLORS.length],
-      percentage: (count / winCount) * 100
-    }));
-
-  // CSS conic-gradient の生成
-  const getConicGradient = () => {
-    if (winCount === 0) return 'gray';
-    let currentDeg = 0;
-    return `conic-gradient(${finishData.map(d => {
-      const start = currentDeg;
-      currentDeg += d.percentage;
-      return `${d.color} ${start}% ${currentDeg}%`;
-    }).join(', ')})`;
-  };
-
-  // --- Handlers ---
   const handleMainImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       try {
@@ -387,10 +420,51 @@ const StoreDetailModal = ({
     }
   };
 
-  // --- Render Functions ---
+  const storeRecords = allRecords.filter(r => r.storeName === editingStore.name);
+  const winRecords = storeRecords.filter(r => r.result === 'win');
+  const loseRecords = storeRecords.filter(r => r.result === 'lose');
+
+  const totalSpent = storeRecords.reduce((sum, r) => sum + r.totalCost, 0);
+  const winCount = winRecords.length;
+  const winRate = storeRecords.length > 0 ? Math.round((winCount / storeRecords.length) * 100) : 0;
+  
+  const winTotalCost = winRecords.reduce((sum, r) => sum + r.totalCost, 0);
+  const winAvgCost = winCount > 0 ? Math.round(winTotalCost / winCount) : 0;
+
+  const loseTotalCost = loseRecords.reduce((sum, r) => sum + r.totalCost, 0);
+  const loseCount = loseRecords.length;
+  const loseAvgCost = loseCount > 0 ? Math.round(loseTotalCost / loseCount) : 0;
+  
+  const realAvgCostPerWin = winCount > 0 ? Math.round(totalSpent / winCount) : 0;
+
+  const finishCounts = winRecords.reduce((acc, r) => {
+    const type = r.finishType || '未設定';
+    acc[type] = (acc[type] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const PIE_COLORS = ['#fbbf24', '#f87171', '#60a5fa', '#34d399', '#a78bfa', '#fb923c', '#9ca3af'];
+  const finishData = Object.entries(finishCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, count], index) => ({
+      name,
+      count,
+      color: PIE_COLORS[index % PIE_COLORS.length],
+      percentage: (count / winCount) * 100
+    }));
+
+  const getConicGradient = () => {
+    if (winCount === 0) return 'gray';
+    let currentDeg = 0;
+    return `conic-gradient(${finishData.map(d => {
+      const start = currentDeg;
+      currentDeg += d.percentage;
+      return `${d.color} ${start}% ${currentDeg}%`;
+    }).join(', ')})`;
+  };
+
   const renderViewMode = () => (
     <div className="flex-1 overflow-y-auto bg-gray-50 relative pb-24 no-scrollbar">
-      {/* Hero Image */}
       <div className="h-64 w-full bg-gray-200 relative">
         {editingStore.photoUrl ? (
           <img src={editingStore.photoUrl} alt={editingStore.name} className="w-full h-full object-cover" />
@@ -434,14 +508,12 @@ const StoreDetailModal = ({
           </div>
         </div>
 
-        {/* Store Specific Report */}
         <div className="bg-white rounded-2xl shadow-sm p-5 space-y-3 mt-4">
           <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
             <BarChart3 size={16} className="text-purple-500" />
             この店舗の戦績
           </h3>
           
-          {/* Main Stats */}
           <div className="grid grid-cols-2 gap-3">
              <div className="bg-gray-50 p-3 rounded-xl">
                <div className="text-[10px] text-gray-500 font-bold uppercase">総使用金額</div>
@@ -451,7 +523,6 @@ const StoreDetailModal = ({
                <div className="text-[10px] text-gray-500 font-bold uppercase">獲得率</div>
                <div className="text-lg font-black text-gray-800">{winRate}%</div>
              </div>
-             {/* 実績単価（リッチ表示） */}
              <div className="col-span-2 bg-gradient-to-r from-purple-500 to-indigo-600 p-4 rounded-xl shadow-md text-white flex justify-between items-center">
                <div>
                  <div className="text-xs font-bold uppercase opacity-90 mb-1">実績単価 (撤退込)</div>
@@ -464,7 +535,6 @@ const StoreDetailModal = ({
              </div>
           </div>
 
-          {/* Win / Lose Detail */}
           <div className="grid grid-cols-2 gap-3">
              <div className="bg-yellow-50 p-3 rounded-xl border border-yellow-100">
                <div className="text-xs font-bold text-yellow-700 flex items-center gap-1 mb-2"><Trophy size={12}/> 獲得実績</div>
@@ -482,19 +552,16 @@ const StoreDetailModal = ({
              </div>
           </div>
 
-          {/* Finish Pie Chart */}
           {winCount > 0 && (
              <div className="border-t border-gray-100 pt-4">
                 <h4 className="text-xs font-bold text-gray-500 uppercase mb-3 flex items-center gap-2">
                   <PieChart size={12} /> 獲得時の決め手
                 </h4>
                 <div className="flex items-center gap-6">
-                  {/* Pie Chart */}
                   <div 
                     className="w-24 h-24 rounded-full flex-shrink-0 shadow-inner"
                     style={{ background: getConicGradient() }}
                   />
-                  {/* Legend */}
                   <div className="flex-1 space-y-1.5">
                     {finishData.map(d => (
                       <div key={d.name} className="flex items-center justify-between text-xs">
@@ -511,7 +578,6 @@ const StoreDetailModal = ({
           )}
         </div>
 
-        {/* Booth Settings & Memo */}
         {(editingStore.boothSettings || editingStore.memo) && (
           <div className="bg-white rounded-2xl shadow-sm p-5 space-y-4 mt-4">
              {editingStore.boothSettings && (
@@ -529,7 +595,6 @@ const StoreDetailModal = ({
           </div>
         )}
 
-        {/* Interior Photos Gallery */}
         {editingStore.interiorPhotos && editingStore.interiorPhotos.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm p-5 space-y-3 mt-4">
              <h4 className="text-sm font-bold text-gray-800 flex items-center gap-2"><ImageIcon size={16} className="text-blue-500" /> 店舗内写真</h4>
@@ -544,7 +609,6 @@ const StoreDetailModal = ({
         )}
       </div>
 
-      {/* Floating Edit Button */}
       <div className="fixed bottom-0 left-0 w-full p-4 bg-white border-t border-gray-100 pb-[env(safe-area-inset-bottom)] z-20">
         <button 
           onClick={() => setIsEditing(true)}
@@ -630,7 +694,7 @@ const StoreDetailModal = ({
              <div className="text-right text-xs text-gray-400 mt-1">{editingStore.boothCountRating || 0} / 10</div>
            </div>
            <div>
-             <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1"><Settings2 size={12}/> ブースの設定</label>
+             <label className="text-xs font-bold text-gray-500 uppercase flex items-center gap-1"><Settings2 size={12}/> ブース設定</label>
              <textarea value={editingStore.boothSettings || ''} onChange={e => setEditingStore({...editingStore, boothSettings: e.target.value})} placeholder="例: 3本爪多め、橋渡し設定が厳しい..." className="w-full mt-1 p-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none min-h-[80px]"/>
            </div>
            <div>
@@ -652,7 +716,7 @@ const StoreDetailModal = ({
   );
 };
 
-// 4. IOSInstallPrompt
+// 5. IOSInstallPrompt
 const IOSInstallPrompt = () => {
   const [isVisible, setIsVisible] = useState(false);
   useEffect(() => {
@@ -673,14 +737,14 @@ const IOSInstallPrompt = () => {
   );
 };
 
-// 5. NavButton
+// 6. NavButton
 const NavButton = ({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) => (
   <button onClick={onClick} className={`flex flex-col items-center justify-center w-full h-full space-y-1 pb-1 ${active ? 'text-purple-600' : 'text-gray-400'}`}>
     {icon}<span className="text-[10px] font-medium">{label}</span>
   </button>
 );
 
-// 6. PlayModeOverlay
+// 7. PlayModeOverlay
 const PlayModeOverlay = ({ moves, events, onIncrement, onDecrement, onEvent, onClose, viewportHeight }: { moves: number, events: PlayEvent[], onIncrement: () => void, onDecrement: () => void, onEvent: (type: 'assist' | 'reset') => void, onClose: () => void, viewportHeight: string }) => {
   const [confirmType, setConfirmType] = useState<'assist' | 'reset' | null>(null);
   const [overlayHeight, setOverlayHeight] = useState(viewportHeight);
@@ -726,7 +790,7 @@ const PlayModeOverlay = ({ moves, events, onIncrement, onDecrement, onEvent, onC
   );
 };
 
-// 7. StatsView
+// 8. StatsView
 const StatsView = ({ records, storeOptions, onUpdateStore }: { records: GameRecord[], storeOptions: StoreOption[], onUpdateStore: (store: StoreOption) => void }) => {
   const [tab, setTab] = useState<'report' | 'stores'>('report');
   const [periodType, setPeriodType] = useState<'day' | 'month' | 'year' | 'all'>('month');
@@ -811,7 +875,7 @@ const StatsView = ({ records, storeOptions, onUpdateStore }: { records: GameReco
   );
 };
 
-// 8. ListView (No changes)
+// 9. ListView (No changes)
 const ListView = ({ records, onDelete, onEdit, onAdd }: { records: GameRecord[], onDelete: (id: string) => void, onEdit: (r: GameRecord) => void, onAdd: () => void }) => {
   const [filterStore, setFilterStore] = useState<string>('all');
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
@@ -883,75 +947,6 @@ const ListView = ({ records, onDelete, onEdit, onAdd }: { records: GameRecord[],
         })
       )}
       <div className="h-12 text-center text-xs text-gray-400 pt-4">これ以上の履歴はありません</div>
-    </div>
-  );
-};
-
-// 9. CalendarView (No changes)
-const CalendarView = ({ records, onEdit, onDelete }: { records: GameRecord[], onEdit: (r: GameRecord) => void, onDelete: (id: string) => void }) => {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [selectedDay, setSelectedDay] = useState<{date: string, records: GameRecord[]} | null>(null);
-  const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
-  const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
-  const year = currentDate.getFullYear();
-  const month = currentDate.getMonth();
-  const daysInMonth = getDaysInMonth(year, month);
-  const firstDay = getFirstDayOfMonth(year, month);
-  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
-  const blanks = Array.from({ length: firstDay }, (_, i) => i);
-  const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
-  const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
-  const dailyTotals = records.reduce((acc, record) => {
-    const d = new Date(record.date);
-    if (d.getFullYear() === year && d.getMonth() === month) {
-      const day = d.getDate();
-      if (!acc[day]) acc[day] = { cost: 0, count: 0, records: [] };
-      acc[day].cost += record.totalCost;
-      acc[day].count += 1;
-      acc[day].records.push(record);
-    }
-    return acc;
-  }, {} as Record<number, { cost: number, count: number, records: GameRecord[] }>);
-  const handleDayClick = (day: number, dailyRecords: GameRecord[]) => {
-    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    setSelectedDay({ date: dateStr, records: dailyRecords });
-  };
-  return (
-    <div className="p-4">
-      <div className="flex items-center justify-between mb-4"><button onClick={prevMonth} className="p-2 hover:bg-gray-200 rounded-full text-gray-600"><ChevronLeft size={24} /></button><h2 className="text-xl font-bold text-gray-800">{year}年 {month + 1}月</h2><button onClick={nextMonth} className="p-2 hover:bg-gray-200 rounded-full text-gray-600"><ChevronRight size={24} /></button></div>
-      <div className="mb-4 bg-pink-50 rounded-lg p-3 flex justify-between items-center text-sm"><span className="text-gray-600 font-bold">今月の合計</span><span className="text-xl font-black text-pink-600">¥{Object.values(dailyTotals).reduce((sum, d) => sum + d.cost, 0).toLocaleString()}</span></div>
-      <div className="grid grid-cols-7 gap-1 mb-2">{['日', '月', '火', '水', '木', '金', '土'].map((day, i) => <div key={i} className={`text-center text-xs font-bold py-1 ${i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-gray-400'}`}>{day}</div>)}</div>
-      <div className="grid grid-cols-7 gap-1">{blanks.map((_, i) => <div key={`blank-${i}`} className="aspect-square bg-gray-50 rounded-md" />)}{days.map((day) => { const data = dailyTotals[day]; const hasData = !!data; let bgClass = "bg-white border-gray-100"; if (hasData) { if (data.cost > 5000) bgClass = "bg-pink-200 border-pink-300"; else if (data.cost > 2000) bgClass = "bg-pink-100 border-pink-200"; else bgClass = "bg-pink-50 border-pink-100"; } const isToday = new Date().toDateString() === new Date(year, month, day).toDateString(); return (<div key={day} onClick={() => handleDayClick(day, data?.records || [])} className={`aspect-square rounded-lg border p-1 flex flex-col justify-between relative overflow-hidden cursor-pointer active:scale-95 transition ${bgClass} ${isToday ? 'ring-2 ring-purple-400 ring-offset-1' : ''}`}><span className={`text-xs font-bold ${isToday ? 'text-purple-600' : 'text-gray-500'}`}>{day}</span>{hasData && <div className="text-[9px] font-bold text-gray-700 text-right leading-tight">¥{data.cost.toLocaleString()}</div>}</div>); })}</div>
-      <div className="mt-6"><h3 className="text-sm font-bold text-gray-500 mb-2">今月の詳細</h3>{Object.keys(dailyTotals).length === 0 ? <div className="text-center text-xs text-gray-400 py-4">この月の記録はありません</div> : <div className="text-xs text-gray-400 text-center py-2">日付をタップすると詳細が表示されます</div>}</div>
-      {selectedDay && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4 animate-in fade-in duration-200 pb-[calc(1rem+env(safe-area-inset-bottom))]" onClick={() => setSelectedDay(null)}>
-          <div className="bg-white w-full max-w-sm rounded-2xl p-4 shadow-2xl animate-in slide-in-from-bottom-10 duration-200 max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-3"><div className="flex flex-col"><h3 className="font-bold text-lg text-gray-800">{new Date(selectedDay.date).toLocaleDateString('ja-JP', {year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'})}</h3><span className="text-xs text-gray-500">合計: ¥{selectedDay.records.reduce((sum, r) => sum + r.totalCost, 0).toLocaleString()}</span></div><button onClick={() => setSelectedDay(null)} className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200"><X size={20}/></button></div>
-            <div className="flex-1 overflow-y-auto space-y-3 pr-1 no-scrollbar">
-              {selectedDay.records.length > 0 ? (
-                selectedDay.records.map((record) => (
-                  <div key={record.id} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                    <div className="flex gap-3">
-                      <div className="w-16 h-16 bg-white rounded-lg overflow-hidden flex-shrink-0 relative border border-gray-100">{record.photoUrl ? <img src={record.photoUrl} alt={record.prizeName} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-300"><Camera size={16} /></div>}<div className={`absolute bottom-0 w-full h-1 ${record.result === 'win' ? 'bg-yellow-400' : 'bg-blue-300'}`}></div></div>
-                      <div className="flex-1 flex flex-col justify-between">
-                        <div><h4 className="text-sm font-bold text-gray-800 line-clamp-1">{record.prizeName}</h4><div className="flex items-center gap-2 mt-1 flex-wrap"><p className="text-[10px] text-gray-500 flex items-center gap-1"><MapPin size={8} /> {record.storeName}</p>{record.seriesName && <p className="text-[10px] text-gray-500 flex items-center gap-1 bg-gray-50 px-1 rounded"><Box size={8} /> {record.seriesName}</p>}{record.settingName && <p className="text-[10px] text-gray-500 flex items-center gap-1 bg-gray-50 px-1 rounded"><Settings2 size={8} /> {record.settingName}</p>}{record.finishType && <p className="text-[10px] text-yellow-600 flex items-center gap-1 bg-yellow-50 px-1 rounded"><Flag size={8} /> {record.finishType}</p>}</div></div>
-                        <div className="flex justify-between items-end mt-1">
-                          <div className="flex items-center gap-2"><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${record.result === 'win' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}`}>{record.result === 'win' ? 'GET' : '撤退'}</span><span className="text-xs font-bold text-gray-700">¥{record.totalCost.toLocaleString()}</span></div>
-                          <div className="flex items-center gap-1">
-                            <button onClick={() => { onEdit(record); setSelectedDay(null); }} className="p-1.5 text-gray-400 hover:text-pink-500 hover:bg-white rounded-lg transition"><Edit size={14} /></button>
-                            <button onClick={() => onDelete(record.id)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-white rounded-lg transition"><Trash2 size={14} /></button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                    {record.memo && <div className="mt-2 pt-2 border-t border-gray-200/50 flex gap-2"><FileText size={10} className="text-gray-400 mt-0.5 flex-shrink-0" /><p className="text-[10px] text-gray-600 line-clamp-2">{record.memo}</p></div>}
-                  </div>
-                ))
-              ) : (<div className="text-center text-gray-400 py-8">記録はありません</div>)}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -1148,15 +1143,30 @@ const AddForm = ({
   );
 };
 
-// 12. SettingsView (Same as before)
-const SettingsView = ({ onBack, onDataChanged }: { onBack: () => void, onDataChanged: () => Promise<void> }) => {
+// 12. SettingsView
+const SettingsView = ({ 
+  onBack, 
+  onDataChanged,
+  storeOptions,
+  seriesOptions,
+  settingOptions,
+  finishOptions,
+  onUpdateOption,
+  onDeleteOption
+}: { 
+  onBack: () => void, 
+  onDataChanged: () => Promise<void>,
+  storeOptions: OptionItem[],
+  seriesOptions: OptionItem[],
+  settingOptions: OptionItem[],
+  finishOptions: OptionItem[],
+  onUpdateOption: (type: 'store' | 'series' | 'setting' | 'finish', id: string, newName: string) => void,
+  onDeleteOption: (type: 'store' | 'series' | 'setting' | 'finish', id: string) => void
+}) => {
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // ... (Export/Import/Reset logic remains same, but need to handle new stores if exporting/importing V2 data structure)
-  // For simplicity, using getAll on objectStoreNames can dynamically fetch all stores.
-  // But here we'll explicitly list them for clarity.
+  const [activeManager, setActiveManager] = useState<'store' | 'series' | 'setting' | 'finish' | null>(null);
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -1267,11 +1277,35 @@ const SettingsView = ({ onBack, onDataChanged }: { onBack: () => void, onDataCha
 
   return (
     <div className="bg-white min-h-full">
+      {activeManager && (
+        <ManageOptions 
+           type={activeManager}
+           data={
+             activeManager === 'store' ? storeOptions :
+             activeManager === 'series' ? seriesOptions :
+             activeManager === 'setting' ? settingOptions : finishOptions
+           }
+           onUpdate={(id, name) => onUpdateOption(activeManager, id, name)}
+           onDelete={(id) => onDeleteOption(activeManager, id)}
+           onClose={() => setActiveManager(null)}
+        />
+      )}
+      
       <div className="p-4 border-b border-gray-100 flex items-center gap-2 sticky top-0 bg-white/80 backdrop-blur-md z-10">
         <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full"><ChevronLeft size={24} className="text-gray-600" /></button>
         <h2 className="text-lg font-bold text-gray-800">設定・データ管理</h2>
       </div>
       <div className="p-6 space-y-8">
+        <section className="space-y-4">
+          <h3 className="text-sm font-bold text-gray-500 uppercase flex items-center gap-2"><List size={16} /> 選択肢の管理</h3>
+          <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+             <button onClick={() => setActiveManager('store')} className="w-full flex items-center justify-between p-4 hover:bg-gray-50 border-b border-gray-100 text-gray-700 font-bold">店舗名 <ChevronRight size={18} className="text-gray-400"/></button>
+             <button onClick={() => setActiveManager('series')} className="w-full flex items-center justify-between p-4 hover:bg-gray-50 border-b border-gray-100 text-gray-700 font-bold">シリーズ <ChevronRight size={18} className="text-gray-400"/></button>
+             <button onClick={() => setActiveManager('setting')} className="w-full flex items-center justify-between p-4 hover:bg-gray-50 border-b border-gray-100 text-gray-700 font-bold">ブース設定 <ChevronRight size={18} className="text-gray-400"/></button>
+             <button onClick={() => setActiveManager('finish')} className="w-full flex items-center justify-between p-4 hover:bg-gray-50 text-gray-700 font-bold">決め手 <ChevronRight size={18} className="text-gray-400"/></button>
+          </div>
+        </section>
+
         <section className="space-y-4">
           <h3 className="text-sm font-bold text-gray-500 uppercase flex items-center gap-2"><Save size={16} /> バックアップと復元</h3>
           <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100 space-y-4">
@@ -1293,7 +1327,7 @@ const SettingsView = ({ onBack, onDataChanged }: { onBack: () => void, onDataCha
         <section className="text-center pt-8 pb-4">
           <div className="inline-flex items-center justify-center w-12 h-12 bg-gray-100 rounded-full mb-3"><Gamepad2 size={24} className="text-gray-400" /></div>
           <h4 className="font-bold text-gray-400 text-sm">クレログ</h4>
-          <p className="text-xs text-gray-300 mt-1">Version 1.2.0 (Offline Mode)</p>
+          <p className="text-xs text-gray-300 mt-1">Version 1.3.0 (Offline Mode)</p>
         </section>
       </div>
     </div>
@@ -1392,10 +1426,11 @@ export default function CraneGameLog() {
       ]);
 
       setRecords(recs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime() || b.createdAt - a.createdAt));
-      setStoreOptions(stores.sort((a, b) => a.createdAt - b.createdAt));
-      setSeriesOptions(series.sort((a, b) => a.createdAt - b.createdAt));
-      setSettingOptions(settings.sort((a, b) => a.createdAt - b.createdAt));
-      setFinishOptions(finishes.sort((a, b) => a.createdAt - b.createdAt));
+      // ソート順を五十音順に変更
+      setStoreOptions(stores.sort((a, b) => a.name.localeCompare(b.name, 'ja')));
+      setSeriesOptions(series.sort((a, b) => a.name.localeCompare(b.name, 'ja')));
+      setSettingOptions(settings.sort((a, b) => a.name.localeCompare(b.name, 'ja')));
+      setFinishOptions(finishes.sort((a, b) => a.name.localeCompare(b.name, 'ja')));
       
       setLoading(false);
     } catch (e) {
@@ -1407,6 +1442,74 @@ export default function CraneGameLog() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Update Option Name Logic (with cascading update to records)
+  const handleUpdateOption = async (type: 'store' | 'series' | 'setting' | 'finish', id: string, newName: string) => {
+    try {
+      const db = await openDB();
+      const storeName = 
+        type === 'store' ? 'store_options' : 
+        type === 'series' ? 'series_options' : 
+        type === 'setting' ? 'setting_options' : 'finish_options';
+      
+      const tx = db.transaction(['records', storeName], 'readwrite');
+      const optionStore = tx.objectStore(storeName);
+      const recordStore = tx.objectStore('records');
+
+      // 1. Get old option data
+      const option: OptionItem = await new Promise((resolve) => {
+        optionStore.get(id).onsuccess = (e: any) => resolve(e.target.result);
+      });
+      
+      const oldName = option.name;
+      option.name = newName;
+      await optionStore.put(option); // Update option name
+
+      // 2. Update all records that use this option name
+      const recordsReq = recordStore.openCursor();
+      recordsReq.onsuccess = (e: any) => {
+        const cursor = e.target.result;
+        if (cursor) {
+          const record = cursor.value;
+          let updated = false;
+
+          if (type === 'store' && record.storeName === oldName) { record.storeName = newName; updated = true; }
+          if (type === 'series' && record.seriesName === oldName) { record.seriesName = newName; updated = true; }
+          if (type === 'setting' && record.settingName === oldName) { record.settingName = newName; updated = true; }
+          if (type === 'finish' && record.finishType === oldName) { record.finishType = newName; updated = true; }
+
+          if (updated) {
+            cursor.update(record);
+          }
+          cursor.continue();
+        }
+      };
+
+      await new Promise(resolve => { tx.oncomplete = resolve; });
+      await fetchData();
+    } catch (e) {
+      console.error("Error updating option:", e);
+      alert("更新に失敗しました。");
+    }
+  };
+
+  const handleDeleteOption = async (type: 'store' | 'series' | 'setting' | 'finish', id: string) => {
+    try {
+      const db = await openDB();
+      const storeName = 
+        type === 'store' ? 'store_options' : 
+        type === 'series' ? 'series_options' : 
+        type === 'setting' ? 'setting_options' : 'finish_options';
+        
+      const tx = db.transaction(storeName, 'readwrite');
+      await tx.objectStore(storeName).delete(id);
+      await new Promise(resolve => { tx.oncomplete = resolve; });
+      await fetchData();
+    } catch (e) {
+      console.error("Error deleting option:", e);
+      alert("削除に失敗しました。");
+    }
+  };
 
   const handleUpdateStore = async (store: StoreOption) => {
     try {
@@ -1567,7 +1670,18 @@ export default function CraneGameLog() {
             setFormData={setFormData} 
           />}
           {view === 'stats' && <StatsView records={records} storeOptions={storeOptions} onUpdateStore={handleUpdateStore} />}
-          {view === 'settings' && <SettingsView onBack={async () => { await fetchData(); handleNavigation('history'); }} onDataChanged={fetchData} />}
+          {view === 'settings' && 
+            <SettingsView 
+              onBack={async () => { await fetchData(); handleNavigation('history'); }} 
+              onDataChanged={fetchData}
+              storeOptions={storeOptions}
+              seriesOptions={seriesOptions}
+              settingOptions={settingOptions}
+              finishOptions={finishOptions}
+              onUpdateOption={handleUpdateOption}
+              onDeleteOption={handleDeleteOption}
+            />
+          }
         </div>
       </main>
 
