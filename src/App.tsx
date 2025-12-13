@@ -305,9 +305,9 @@ const ManageOptions = ({
         <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-full"><ArrowLeft size={24} className="text-gray-600" /></button>
         <h2 className="text-lg font-bold text-gray-800">{getTitle()}</h2>
       </div>
-      <div className="flex-1 overflow-y-auto p-4 space-y-2">
+      <div className="flex-1 overflow-y-auto p-4 space-y-2 pb-24">
         <p className="text-xs text-gray-500 mb-4 bg-yellow-50 p-3 rounded-lg border border-yellow-100">
-           ※ここでの変更は、過去のすべての記録にも反映されます。
+           ※名称を変更すると、その項目を使用している過去のすべての記録も自動的に更新されます。
         </p>
         {data.length === 0 ? (
           <div className="text-center text-gray-400 py-10">データがありません</div>
@@ -323,15 +323,15 @@ const ManageOptions = ({
                     className="flex-1 p-2 border border-blue-300 rounded-lg outline-none text-sm"
                     autoFocus
                   />
-                  <button onClick={saveEdit} className="bg-blue-500 text-white px-3 rounded-lg text-xs font-bold">保存</button>
-                  <button onClick={() => setEditingId(null)} className="bg-gray-200 text-gray-600 px-3 rounded-lg text-xs font-bold">キャンセル</button>
+                  <button onClick={saveEdit} className="bg-blue-500 text-white px-3 rounded-lg text-xs font-bold whitespace-nowrap">保存</button>
+                  <button onClick={() => setEditingId(null)} className="bg-gray-200 text-gray-600 px-3 rounded-lg text-xs font-bold whitespace-nowrap">戻る</button>
                 </div>
               ) : (
                 <>
                   <span className="font-bold text-gray-700">{item.name}</span>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => startEdit(item)} className="p-2 text-gray-400 hover:text-blue-500"><Pencil size={16}/></button>
-                    <button onClick={() => { if(window.confirm('本当に削除しますか？\n（過去の記録の表示は維持されますが、選択肢からは消えます）')) onDelete(item.id); }} className="p-2 text-gray-400 hover:text-red-500"><Trash2 size={16}/></button>
+                    <button onClick={() => startEdit(item)} className="p-2 text-gray-400 hover:text-blue-500 rounded-full hover:bg-blue-50"><Pencil size={16}/></button>
+                    <button onClick={() => { if(window.confirm(`「${item.name}」を削除しますか？\n（過去の記録の表示は維持されますが、選択肢からは消えます）`)) onDelete(item.id); }} className="p-2 text-gray-400 hover:text-red-500 rounded-full hover:bg-red-50"><Trash2 size={16}/></button>
                   </div>
                 </>
               )}
@@ -612,7 +612,7 @@ const StoreDetailModal = ({
       <div className="fixed bottom-0 left-0 w-full p-4 bg-white border-t border-gray-100 pb-[env(safe-area-inset-bottom)] z-20">
         <button 
           onClick={() => setIsEditing(true)}
-          className="w-full py-3 bg-gray-900 text-white font-bold rounded-xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2"
+          className="w-full py-3 bg-purple-600 text-white font-bold rounded-xl shadow-lg active:scale-95 transition flex items-center justify-center gap-2"
         >
           <Pencil size={18} />
           情報を編集
@@ -875,7 +875,7 @@ const StatsView = ({ records, storeOptions, onUpdateStore }: { records: GameReco
   );
 };
 
-// 9. ListView (No changes)
+// 8. ListView
 const ListView = ({ records, onDelete, onEdit, onAdd }: { records: GameRecord[], onDelete: (id: string) => void, onEdit: (r: GameRecord) => void, onAdd: () => void }) => {
   const [filterStore, setFilterStore] = useState<string>('all');
   const [expandedDates, setExpandedDates] = useState<Set<string>>(new Set());
@@ -947,6 +947,76 @@ const ListView = ({ records, onDelete, onEdit, onAdd }: { records: GameRecord[],
         })
       )}
       <div className="h-12 text-center text-xs text-gray-400 pt-4">これ以上の履歴はありません</div>
+    </div>
+  );
+};
+
+// 9. CalendarView
+const CalendarView = ({ records, onEdit, onDelete }: { records: GameRecord[], onEdit: (r: GameRecord) => void, onDelete: (id: string) => void }) => {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDay, setSelectedDay] = useState<{date: string, records: GameRecord[]} | null>(null);
+
+  const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
+  const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  const daysInMonth = getDaysInMonth(year, month);
+  const firstDay = getFirstDayOfMonth(year, month);
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const blanks = Array.from({ length: firstDay }, (_, i) => i);
+  const prevMonth = () => setCurrentDate(new Date(year, month - 1, 1));
+  const nextMonth = () => setCurrentDate(new Date(year, month + 1, 1));
+  const dailyTotals = records.reduce((acc, record) => {
+    const d = new Date(record.date);
+    if (d.getFullYear() === year && d.getMonth() === month) {
+      const day = d.getDate();
+      if (!acc[day]) acc[day] = { cost: 0, count: 0, records: [] };
+      acc[day].cost += record.totalCost;
+      acc[day].count += 1;
+      acc[day].records.push(record);
+    }
+    return acc;
+  }, {} as Record<number, { cost: number, count: number, records: GameRecord[] }>);
+  const handleDayClick = (day: number, dailyRecords: GameRecord[]) => {
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    setSelectedDay({ date: dateStr, records: dailyRecords });
+  };
+  return (
+    <div className="p-4">
+      <div className="flex items-center justify-between mb-4"><button onClick={prevMonth} className="p-2 hover:bg-gray-200 rounded-full text-gray-600"><ChevronLeft size={24} /></button><h2 className="text-xl font-bold text-gray-800">{year}年 {month + 1}月</h2><button onClick={nextMonth} className="p-2 hover:bg-gray-200 rounded-full text-gray-600"><ChevronRight size={24} /></button></div>
+      <div className="mb-4 bg-pink-50 rounded-lg p-3 flex justify-between items-center text-sm"><span className="text-gray-600 font-bold">今月の合計</span><span className="text-xl font-black text-pink-600">¥{Object.values(dailyTotals).reduce((sum, d) => sum + d.cost, 0).toLocaleString()}</span></div>
+      <div className="grid grid-cols-7 gap-1 mb-2">{['日', '月', '火', '水', '木', '金', '土'].map((day, i) => <div key={i} className={`text-center text-xs font-bold py-1 ${i === 0 ? 'text-red-400' : i === 6 ? 'text-blue-400' : 'text-gray-400'}`}>{day}</div>)}</div>
+      <div className="grid grid-cols-7 gap-1">{blanks.map((_, i) => <div key={`blank-${i}`} className="aspect-square bg-gray-50 rounded-md" />)}{days.map((day) => { const data = dailyTotals[day]; const hasData = !!data; let bgClass = "bg-white border-gray-100"; if (hasData) { if (data.cost > 5000) bgClass = "bg-pink-200 border-pink-300"; else if (data.cost > 2000) bgClass = "bg-pink-100 border-pink-200"; else bgClass = "bg-pink-50 border-pink-100"; } const isToday = new Date().toDateString() === new Date(year, month, day).toDateString(); return (<div key={day} onClick={() => handleDayClick(day, data?.records || [])} className={`aspect-square rounded-lg border p-1 flex flex-col justify-between relative overflow-hidden cursor-pointer active:scale-95 transition ${bgClass} ${isToday ? 'ring-2 ring-purple-400 ring-offset-1' : ''}`}><span className={`text-xs font-bold ${isToday ? 'text-purple-600' : 'text-gray-500'}`}>{day}</span>{hasData && <div className="text-[9px] font-bold text-gray-700 text-right leading-tight">¥{data.cost.toLocaleString()}</div>}</div>); })}</div>
+      <div className="mt-6"><h3 className="text-sm font-bold text-gray-500 mb-2">今月の詳細</h3>{Object.keys(dailyTotals).length === 0 ? <div className="text-center text-xs text-gray-400 py-4">この月の記録はありません</div> : <div className="text-xs text-gray-400 text-center py-2">日付をタップすると詳細が表示されます</div>}</div>
+      {selectedDay && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4 animate-in fade-in duration-200 pb-[calc(1rem+env(safe-area-inset-bottom))]" onClick={() => setSelectedDay(null)}>
+          <div className="bg-white w-full max-w-sm rounded-2xl p-4 shadow-2xl animate-in slide-in-from-bottom-10 duration-200 max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-3"><div className="flex flex-col"><h3 className="font-bold text-lg text-gray-800">{new Date(selectedDay.date).toLocaleDateString('ja-JP', {year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'})}</h3><span className="text-xs text-gray-500">合計: ¥{selectedDay.records.reduce((sum, r) => sum + r.totalCost, 0).toLocaleString()}</span></div><button onClick={() => setSelectedDay(null)} className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200"><X size={20}/></button></div>
+            <div className="flex-1 overflow-y-auto space-y-3 pr-1 no-scrollbar">
+              {selectedDay.records.length > 0 ? (
+                selectedDay.records.map((record) => (
+                  <div key={record.id} className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                    <div className="flex gap-3">
+                      <div className="w-16 h-16 bg-white rounded-lg overflow-hidden flex-shrink-0 relative border border-gray-100">{record.photoUrl ? <img src={record.photoUrl} alt={record.prizeName} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-300"><Camera size={16} /></div>}<div className={`absolute bottom-0 w-full h-1 ${record.result === 'win' ? 'bg-yellow-400' : 'bg-blue-300'}`}></div></div>
+                      <div className="flex-1 flex flex-col justify-between">
+                        <div><h4 className="text-sm font-bold text-gray-800 line-clamp-1">{record.prizeName}</h4><div className="flex items-center gap-2 mt-1 flex-wrap"><p className="text-[10px] text-gray-500 flex items-center gap-1"><MapPin size={8} /> {record.storeName}</p>{record.seriesName && <p className="text-[10px] text-gray-500 flex items-center gap-1 bg-gray-50 px-1 rounded"><Box size={8} /> {record.seriesName}</p>}{record.settingName && <p className="text-[10px] text-gray-500 flex items-center gap-1 bg-gray-50 px-1 rounded"><Settings2 size={8} /> {record.settingName}</p>}{record.finishType && <p className="text-[10px] text-yellow-600 flex items-center gap-1 bg-yellow-50 px-1 rounded"><Flag size={8} /> {record.finishType}</p>}</div></div>
+                        <div className="flex justify-between items-end mt-1">
+                          <div className="flex items-center gap-2"><span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${record.result === 'win' ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}`}>{record.result === 'win' ? 'GET' : '撤退'}</span><span className="text-xs font-bold text-gray-700">¥{record.totalCost.toLocaleString()}</span></div>
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => { onEdit(record); setSelectedDay(null); }} className="p-1.5 text-gray-400 hover:text-pink-500 hover:bg-white rounded-lg transition"><Edit size={14} /></button>
+                            <button onClick={() => onDelete(record.id)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-white rounded-lg transition"><Trash2 size={14} /></button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    {record.memo && <div className="mt-2 pt-2 border-t border-gray-200/50 flex gap-2"><FileText size={10} className="text-gray-400 mt-0.5 flex-shrink-0" /><p className="text-[10px] text-gray-600 line-clamp-2">{record.memo}</p></div>}
+                  </div>
+                ))
+              ) : (<div className="text-center text-gray-400 py-8">記録はありません</div>)}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -1143,7 +1213,7 @@ const AddForm = ({
   );
 };
 
-// 12. SettingsView
+// 12. SettingsView (Same as before)
 const SettingsView = ({ 
   onBack, 
   onDataChanged,
